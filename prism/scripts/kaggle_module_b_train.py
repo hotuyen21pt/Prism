@@ -19,8 +19,9 @@ DEFAULT_REPO = "https://github.com/hotuyen21pt/Prism.git"
 
 
 def clone_repo(url: str, directory: Path) -> Path:
-    if (directory / "src" / "prism").is_dir():
-        return directory
+    for project_root in (directory, directory / "prism"):
+        if (project_root / "src" / "prism").is_dir():
+            return project_root
     if directory.exists() and any(directory.iterdir()):
         raise RuntimeError(f"Repository directory is not empty: {directory}")
     directory.parent.mkdir(parents=True, exist_ok=True)

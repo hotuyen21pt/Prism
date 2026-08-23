@@ -1,0 +1,22 @@
+# PRISM pipeline — xem src/prism/README.md §0
+# Runtime cơ bản cho Module A/D, smoke_test và eval_injection.
+numpy>=1.24
+scipy>=1.10
+pillow>=10.0
+tqdm>=4.66
+
+# Module B (train/infer):
+torch>=2.1
+torchvision>=0.16
+transformers>=4.38
+sentencepiece>=0.1.99
+accelerate>=0.27
+scikit-learn>=1.3
+
+# Module C (image verifier):
+open_clip_torch>=2.24
+
+# Module D tuỳ chọn:
+statsmodels>=0.14       # chỉ cần nếu dùng các tiện ích thống kê mở rộng
+# sentence-transformers # kênh semantic drift E_{c,t}
+# fasttext-wheel        # langid thật (A7)

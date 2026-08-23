@@ -1,0 +1,29 @@
+# Generated pipeline outputs and model artifacts
+/outputs/
+/models/
+
+# Large local datasets
+/data/raw/*.jsonl
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Local configuration and tooling files
+.env
+.vscode/
+
+# Temporary and editor files
+*.tmp
+*.temp
+*.log
+*.swp
+*.swo
+Thumbs.db
+.DS_Store

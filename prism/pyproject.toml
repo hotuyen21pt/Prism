@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prism-tabsa"
+version = "0.1.0"
+description = "PRISM — composition-adjusted aspect-level sentiment drift from semi-supervised multimodal quad extraction (temporal ABSA on hotel reviews)"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Tram Doan", email = "tramdoan93@gmail.com" }]
+# Lõi pipeline (Module A, D, injection, tests) chỉ cần stdlib.
+# Phần nặng (torch/transformers/open_clip) cài theo requirements.txt — xem src/prism/README.md §0.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

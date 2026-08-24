@@ -7,6 +7,9 @@ Chạy:  python3 -m prism.module_b_train --model google/mt5-base --epochs 10
 Ra  :  models/seed_extractor/  (checkpoint + training_log.json)
 
 Sau huấn luyện, đánh giá bằng:  python3 -m prism.module_b_eval
+
+Output: https://www.kaggle.com/code/tuyennguyen21pt/notebooka2db6abdb7/output
+chuyển file thành json
 """
 from __future__ import annotations
 

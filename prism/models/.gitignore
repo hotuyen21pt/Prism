@@ -1,0 +1,4 @@
+# Không bao giờ push model artifacts (checkpoint, weights, tokenizer, log train).
+# Ignore mọi thứ trong models/ nhưng giữ lại chính folder này và file .gitignore.
+*
+!.gitignore

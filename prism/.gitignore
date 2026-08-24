@@ -1,6 +1,8 @@
 # Generated pipeline outputs and model artifacts
 /outputs/
-/models/
+# Ignore all model artifacts but keep the folder + its local .gitignore
+/models/*
+!/models/.gitignore
 
 # Large local datasets
 /data/raw/*.jsonl

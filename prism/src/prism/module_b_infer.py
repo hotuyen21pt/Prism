@@ -108,23 +108,41 @@ def main() -> None:
             out.extend((tok_lp * mask).sum(-1).tolist())
         return out
 
+    def seq_conf(inputs: list[str], targets: list[str]) -> list[float]:
+        """conf_seq = exp(trung bình log-prob token đã sinh) qua teacher forcing.
+
+        Thay cho generate(output_scores=True)+compute_transition_scores — vốn giữ
+        logits full-vocab (~250k) cho MỌI bước sinh nên OOM. Ở đây chỉ gather
+        log-prob của đúng token đã chọn, chunk theo score_batch."""
+        out: list[float] = []
+        for i in range(0, len(inputs), args.score_batch):
+            enc = tok(inputs[i:i + args.score_batch], return_tensors="pt",
+                      padding=True, truncation=True, max_length=160).to(device)
+            lab = tok(targets[i:i + args.score_batch], return_tensors="pt",
+                      padding=True, truncation=True, max_length=192
+                      ).input_ids.to(device)
+            lab_m = lab.clone()
+            lab_m[lab_m == tok.pad_token_id] = -100
+            with torch.no_grad():
+                logits = model(**enc, labels=lab_m).logits
+            lp = torch.log_softmax(logits.float(), dim=-1)
+            tok_lp = lp.gather(-1, lab.unsqueeze(-1)).squeeze(-1)
+            mask = (lab_m != -100).float()
+            mean_lp = (tok_lp * mask).sum(-1) / mask.sum(-1).clamp(min=1)
+            out.extend(mean_lp.exp().tolist())
+        return out
+
     def flush(batch, fout):
         enc = tok([TASK_PREFIX + b["text"] for b in batch], return_tensors="pt",
                   padding=True, truncation=True, max_length=160).to(device)
         with torch.no_grad():
-            gen = model.generate(**enc, max_length=192, num_beams=4,
-                                 output_scores=True, return_dict_in_generate=True)
-            seqs = gen.sequences
-            # seq-level confidence: trung bình log-prob token đã sinh
-            scores = model.compute_transition_scores(
-                seqs, gen.scores, gen.beam_indices, normalize_logits=True)
+            seqs = model.generate(**enc, max_length=192, num_beams=4)
 
-        parsed = []          # (unit, conf, quads)
-        for b, seq, sc in zip(batch, seqs, scores):
-            text_out = tok.decode(seq, skip_special_tokens=True)
-            mask = ~sc.isinf()
-            conf = float(sc[mask].mean().exp()) if mask.any() else 0.0
-            parsed.append((b, conf, parse_linearized(text_out)))
+        texts_out = [tok.decode(s, skip_special_tokens=True) for s in seqs]
+        # seq-level confidence tính bằng teacher forcing (nhẹ VRAM, không giữ full-vocab)
+        confs = seq_conf([TASK_PREFIX + b["text"] for b in batch], texts_out)
+        parsed = [(b, confs[i], parse_linearized(texts_out[i]))   # (unit, conf, quads)
+                  for i, b in enumerate(batch)]
 
         # P_model(s|x) thật: chấm điểm 3 biến thể sentiment cho từng quad
         p_models: dict[tuple[int, int], dict[str, float]] = {}

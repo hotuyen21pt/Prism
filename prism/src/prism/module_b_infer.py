@@ -165,7 +165,7 @@ def main() -> None:
                     "p_model": {s: round(v, 4) for s, v in p_model.items()},
                     "sentiment": s_post,
                     "p_posterior": round(p_post, 4),
-                    "provenance_flip": s_post != q["sentiment_model"],
+                    "provenance_flip": s_post != q["sentiment"],
                 })
                 fout.write(_json.dumps(q, ensure_ascii=False) + "\n")
 

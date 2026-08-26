@@ -19,7 +19,7 @@ thành phần reviewer** với kiểm định thống kê (permutation null + BH
 ├── models/                  # checkpoint huấn luyện — KHÔNG commit
 ├── outputs/                 # mọi sản phẩm pipeline — KHÔNG commit
 │   ├── store/  extract/  reliability/  drift/  probe/
-├── scripts/                 # tiện ích ngoài pipeline (tải ảnh pool, keyword-probe)
+├── scripts/                 # entrypoint Kaggle (kaggle_pipeline.py + wrapper B) & tiện ích
 ├── src/
 │   └── prism/               # package pipeline 4 module (A store · B extractor ·
 │                            #   C reliability · D drift) + smoke_test
@@ -63,6 +63,49 @@ Sau đó làm theo thứ tự chuẩn trong **[src/prism/README.md](src/prism/RE
 
 Đường dẫn cấu hình tập trung tại `src/prism/config.py`; override bằng biến môi trường
 `PRISM_TABSA_ROOT` · `PRISM_HAMOS_ROOT` · `PRISM_WORK_DIR` · `PRISM_MODEL_DIR`.
+
+## Chạy trên Kaggle (GPU) — mỗi cell 1 step
+
+Các bước cần GPU (`train · selftrain · infer`) chạy trên Kaggle. Dùng orchestrator
+`scripts/kaggle_pipeline.py`: **mỗi cell chạy đúng 1 step** để lỗi step nào chỉ hỏng
+step đó. Script tự tìm input theo tên file khắp `/kaggle/input` (kể cả output notebook
+đã attach), stage vào đúng chỗ, và ghi output vào `/kaggle/working` (→ output notebook,
+attach cho step sau). I/O đầy đủ từng step: **[docs/pipeline_io.md](docs/pipeline_io.md)**.
+
+Thứ tự (bất biến): `store → data → train → selftrain → infer → photos →
+c_verifier → c_apply_verifier → c_bridge → c_apply → drift`. Không đảo
+`selftrain → infer` (infer chính thức phải dùng checkpoint tốt nhất từ self-train).
+
+**Cell setup (đầu mỗi notebook):**
+
+```python
+!rm -rf /kaggle/working/Prism
+!git clone --depth 1 https://github.com/hotuyen21pt/Prism.git /kaggle/working/Prism
+P = "/kaggle/working/Prism/prism/scripts/kaggle_pipeline.py"
+```
+
+**Chuỗi notebook** (input notebook sau = output notebook trước, cộng store dùng chung):
+
+| Notebook | Attach | Cell chạy |
+|---|---|---|
+| 1 · selftrain `[GPU]` | prism-dataset, dev-jsonl, store, checkpoint train | `!python {P} --step selftrain --cohort B-anchor --infer-batch 2 --infer-score-batch 4` |
+| 2 · infer `[GPU]` | notebook-1 (ckpt student), store | `!python {P} --step infer --cohort T-unbiased --batch 2 --score-batch 4` |
+| 3 · C+D `[CPU, net]` | notebook-2 (pool_quads), store, hamos-mabsa | `photos → c_verifier → c_apply_verifier → c_bridge → c_apply → drift` (mỗi step 1 cell, cùng `--cohort`) |
+
+Sau mỗi notebook GPU bấm **Save Version (Save & Run All)** để giữ output.
+
+**Hoặc chạy hết trong 1 cell** — tự bỏ qua step đã có output dưới `/kaggle/working`:
+
+```python
+!python {P} --step all --cohort T-unbiased      # thêm --force để chạy lại tất cả
+```
+
+Chưa có `hamos-mabsa` trên Kaggle thì bỏ Module C, chạy thẳng drift (tự fallback dùng
+`pool_quads` với `w=conf_seq`): `!python {P} --step drift --cohort corpus`.
+
+> Bước `train` (seed teacher) và `data`/`store` thường chạy local rồi upload output làm
+> dataset; vẫn chạy được trên Kaggle qua `--step train` / `--step data` / `--step store`
+> nếu attach dữ liệu thô + `hamos-mabsa`.
 
 ## Tài liệu phương pháp
 

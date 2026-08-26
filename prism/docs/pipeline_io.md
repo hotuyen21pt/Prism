@@ -60,7 +60,7 @@ Chuyển `review text → linearize(quads)` cho mT5; tạo chronological split; 
 | **In** | `outputs/extract/train.t2t.jsonl`, `outputs/extract/dev.t2t.jsonl`, base `google/mt5-small` |
 | **Out** | `models/seed_extractor/` (`config.json` + `model.safetensors` + tokenizer + `training_log.json`) |
 
-Kaggle: `scripts/kaggle_module_b_train.py`.
+Kaggle: `kaggle_pipeline.py --step train`.
 
 ---
 
@@ -74,7 +74,7 @@ Kaggle: `scripts/kaggle_module_b_train.py`.
 | **Out** | `models/selftrain_round<r>/`, `outputs/extract/selftrain_history.json` (chứa `final_ckpt`) |
 
 Mỗi vòng **tự** gọi: infer (pseudo-label, `--limit 200000`) → lọc theo `tau/tau_post` → train student → eval dev F1 → dừng sớm nếu F1 giảm hoặc phân phối lệch `> max_skew`.
-Kaggle: `scripts/kaggle_module_b_selftrain.py --infer-batch 2 --infer-score-batch 4`.
+Kaggle: `kaggle_pipeline.py --step selftrain --infer-batch 2 --infer-score-batch 4 --limit 4000`.
 
 > Store là input của bước **infer nội bộ**, KHÔNG phải sản phẩm của B. Nó là output Module A.
 
@@ -91,7 +91,7 @@ Kaggle: `scripts/kaggle_module_b_selftrain.py --infer-batch 2 --infer-score-batc
 
 Sinh quad + `conf_seq` + `p_model` + posterior provenance + cờ `provenance_flip`.
 Lặp cho từng cohort: `T-unbiased`, `A-dense`, `B-anchor`, `corpus`.
-Kaggle: `scripts/kaggle_module_b_infer.py --ckpt <...> --cohort <...> --batch 2 --score-batch 4`.
+Kaggle: `kaggle_pipeline.py --step infer --ckpt <...> --cohort <...> --batch 2 --score-batch 4`.
 
 > Phải chạy SAU selftrain, dùng student cuối. Bản `pool_quads` sinh bằng seed teacher chỉ là sơ bộ, cần đè lại.
 
@@ -180,99 +180,6 @@ data/raw + hamos-mabsa
 
 **Bất biến thứ tự:** `A → B-data → train → selftrain → infer → (photos) → C → D`.
 Không đảo `selftrain → infer` (infer chính thức phải dùng checkpoint tốt nhất từ selftrain).
-
----
-
-# Chạy trên Kaggle — cell từng step
-
-Chỉ các bước **[GPU]** (train / selftrain / infer) mới có wrapper Kaggle riêng
-(`scripts/kaggle_module_b_*.py`) và nên chạy trên Kaggle. Các bước A, B-data, C, D
-là **[CPU]** — thường chạy local rồi upload output làm dataset; nếu muốn chạy trên
-Kaggle vẫn được bằng `!python -m prism.…` sau khi setup (xem cuối).
-
-| Step | Wrapper Kaggle | Máy |
-|---|---|---|
-| 1. A store | (không có — chạy local) | CPU |
-| 2. B-data | (không có — chạy local) | CPU |
-| 3. B-train | `kaggle_module_b_train.py` | GPU |
-| 4. B-selftrain | `kaggle_module_b_selftrain.py` | GPU |
-| 5. B-infer | `kaggle_module_b_infer.py` | GPU |
-| 6. photos | (không có — chạy local, cần mạng) | NET |
-| 7. C reliability | (không có — chạy local) | CPU |
-| 8. D drift | (không có — chạy local) | CPU |
-
-### Setup chung (mỗi notebook, chạy 1 lần) — bật GPU
-
-```python
-# Cell setup — lấy code mới nhất từ GitHub
-!rm -rf /kaggle/working/Prism
-!git clone --depth 1 https://github.com/hotuyen21pt/Prism.git /kaggle/working/Prism
-```
-
-Wrapper tự tìm input theo **tên file** đệ quy khắp `/kaggle/input`, nên attach dataset
-ở đâu cũng được. Nếu tắt internet: bỏ cell clone, attach output notebook có sẵn thư mục
-`Prism` — wrapper sẽ tự dùng lại.
-
----
-
-### Step 3 — Train (seed teacher)  `[GPU]`
-
-Attach: dataset chứa `train.t2t.jsonl` + `dev.t2t.jsonl`.
-
-```python
-!python /kaggle/working/Prism/prism/scripts/kaggle_module_b_train.py \
-    --epochs 10 --batch 4 --grad-accum 8
-# out: /kaggle/working/models/seed_extractor
-```
-
-### Step 4 — Self-train (student)  `[GPU]`
-
-Attach: output notebook train (checkpoint) + dataset `train.t2t.jsonl`, `dev.t2t.jsonl`,
-`dev.jsonl` + store (`hotel_cohorts.json`, `reviews.jsonl.gz`).
-
-```python
-!python /kaggle/working/Prism/prism/scripts/kaggle_module_b_selftrain.py \
-    --rounds 2 --cohort B-anchor \
-    --infer-batch 2 --infer-score-batch 4
-# out: /kaggle/working/models/selftrain_round* + outputs/extract/selftrain_history.json
-```
-
-### Step 5 — Infer chính thức  `[GPU]`
-
-Attach: output notebook selftrain (checkpoint student cuối) + store.
-`--ckpt` trỏ tới `final_ckpt` trong `selftrain_history.json`.
-
-```python
-!python /kaggle/working/Prism/prism/scripts/kaggle_module_b_infer.py \
-    --ckpt /kaggle/input/notebooks/tuyennguyen21pt/module-b-selftrain/models/selftrain_round2 \
-    --cohort T-unbiased --batch 2 --score-batch 4
-# out: /kaggle/working/outputs/extract/pool_quads.T-unbiased.jsonl.gz
-```
-Lặp cell này đổi `--cohort` cho: `A-dense`, `B-anchor`, `corpus`.
-
----
-
-### (Tùy chọn) Chạy bước CPU trên Kaggle — không có wrapper
-
-Sau cell setup, gọi thẳng module (tự set env như wrapper làm):
-
-```python
-import os, sys
-repo = "/kaggle/working/Prism"                       # thư mục có src/prism
-os.environ["PRISM_TABSA_ROOT"] = repo
-os.environ["PRISM_WORK_DIR"]  = "/kaggle/working/outputs"
-os.environ["PRISM_MODEL_DIR"] = "/kaggle/working/models"
-sys.path.insert(0, f"{repo}/src")
-
-# ví dụ Module D (cần quads_weighted.jsonl.gz đã attach/đặt đúng WORK_DIR)
-sys.argv = ["prism.module_d_drift",
-            "--quads", "/kaggle/working/outputs/reliability/quads_weighted.jsonl.gz",
-            "--cohort", "corpus"]
-from prism import module_d_drift; module_d_drift.main()
-```
-
-> A store cần pool thô ~1.5GB nên hầu như luôn chạy local. C reliability cần ảnh pool
-> (bước 6, cần mạng) — trên Kaggle bật internet mới tải được, hoặc upload ảnh sẵn.
 
 ---
 

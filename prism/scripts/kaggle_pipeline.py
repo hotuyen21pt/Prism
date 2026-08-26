@@ -247,8 +247,8 @@ def do_step(step: str, args, repo: Path, env: dict,
                 "Chạy step 'data' trước.")
         copy_in("dev.t2t.jsonl", work / "extract" / "dev.t2t.jsonl", roots)
         run_module("prism.module_b_train",
-                   ["--epochs", str(args.epochs), "--batch", str(args.batch),
-                    "--grad-accum", str(args.grad_accum),
+                   ["--model", args.model, "--epochs", str(args.epochs),
+                    "--batch", str(args.batch), "--grad-accum", str(args.grad_accum),
                     "--out", str(model_dir / "seed_extractor")], env)
 
     elif step == "selftrain":
@@ -350,6 +350,7 @@ def main() -> None:
     ap.add_argument("--cohort", default="T-unbiased")
     ap.add_argument("--ckpt", help="checkpoint cho infer/selftrain (mặc định: tự tìm)")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--model", default="google/mt5-small", help="base model cho step train")
     ap.add_argument("--epochs", type=int, default=10)
     ap.add_argument("--batch", type=int, default=2)
     ap.add_argument("--score-batch", type=int, default=4)

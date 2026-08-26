@@ -19,7 +19,8 @@ thành phần reviewer** với kiểm định thống kê (permutation null + BH
 ├── models/                  # checkpoint huấn luyện — KHÔNG commit
 ├── outputs/                 # mọi sản phẩm pipeline — KHÔNG commit
 │   ├── store/  extract/  reliability/  drift/  probe/
-├── scripts/                 # entrypoint Kaggle (kaggle_pipeline.py + wrapper B) & tiện ích
+├── kaggle_notebooks/        # notebook chạy từng step trên Kaggle (01→11 + full)
+├── scripts/                 # entrypoint Kaggle (kaggle_pipeline.py) & tiện ích (tải ảnh, probe)
 ├── src/
 │   └── prism/               # package pipeline 4 module (A store · B extractor ·
 │                            #   C reliability · D drift) + smoke_test

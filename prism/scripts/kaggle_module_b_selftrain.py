@@ -41,14 +41,37 @@ from pathlib import Path
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 DEFAULT_REPO = "https://github.com/hotuyen21pt/Prism.git"
+SEARCH_ROOTS = ["/kaggle/input", "/kaggle/working"]
+
+
+def _existing_repo(*candidates: Path) -> Path | None:
+    for cand in candidates:
+        for project_root in (cand, cand / "prism"):
+            if (project_root / "src" / "prism").is_dir():
+                return project_root
+    return None
 
 
 def clone_repo(url: str, directory: Path) -> Path:
-    for project_root in (directory, directory / "prism"):
-        if (project_root / "src" / "prism").is_dir():
-            return project_root
+    found = _existing_repo(directory)
+    if found:
+        return found
+    # repo có sẵn dưới /kaggle/input (attach output notebook) hoặc /kaggle/working
+    # -> dùng luôn, chạy được cả khi internet TẮT.
+    for root in SEARCH_ROOTS:
+        for hit in glob.glob(f"{root}/**/src/prism/config.py", recursive=True):
+            repo = Path(hit).parents[2]
+            print("dùng repo có sẵn:", repo)
+            return repo
     directory.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["git", "clone", "--depth", "1", url, str(directory)], check=True)
+    try:
+        subprocess.run(["git", "clone", "--depth", "1", url, str(directory)], check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        raise RuntimeError(
+            "Không lấy được source prism: clone thất bại và không thấy repo dưới "
+            "/kaggle/input. Hãy BẬT internet cho notebook, hoặc attach output "
+            "notebook có sẵn thư mục Prism (src/prism)."
+        ) from e
     return directory / "prism" if (directory / "prism").is_dir() else directory
 
 
@@ -95,6 +118,26 @@ def require(name: str, roots: list[str]) -> str:
     if not hit:
         raise FileNotFoundError(f"Không thấy {name} trong {roots} — attach dataset chưa?")
     return hit
+
+
+def find_ckpt(roots: list[str]) -> str | None:
+    """Thư mục checkpoint HF hợp lệ = có model.safetensors + config.json.
+    Ưu tiên output notebook train để không vớ nhầm checkpoint dở dang."""
+    dirs: list[str] = []
+    for root in roots:
+        for p in glob.glob(f"{root}/**/model.safetensors", recursive=True):
+            d = os.path.dirname(p)
+            if os.path.isfile(os.path.join(d, "config.json")):
+                dirs.append(d)
+    if not dirs:
+        return None
+
+    def rank(d: str) -> tuple:
+        low = d.lower()
+        return ("module-b-train" not in low, "seed_extractor" not in low,
+                "models" not in low, len(d))
+
+    return sorted(set(dirs), key=rank)[0]
 
 
 def prepare_store(src_roots: list[str], store_dst: Path) -> None:
@@ -166,7 +209,7 @@ def main() -> None:
         p = Path(args.seed_ckpt)
         seed = str(p) if p.is_file() else require("model.safetensors", [str(p)])
     else:
-        seed = require("model.safetensors", roots)
+        seed = find_ckpt(roots) or require("model.safetensors", roots)
     seed_dir = Path(seed).parent if os.path.isfile(seed) else Path(seed)
     dst_ckpt = model_dir / "seed_extractor"
     if dst_ckpt.resolve() != seed_dir.resolve():

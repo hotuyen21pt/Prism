@@ -126,19 +126,31 @@ def require(name: str, roots: list[str], hint: str = "") -> str:
     return hit
 
 
-def copy_in(name: str, dst: Path, roots: list[str], hint: str = "") -> None:
+def _safe_copy(src: str, dst: Path) -> bool:
+    """Copy src->dst, nhưng BỎ QUA nếu nguồn trùng đích (đã stage sẵn từ step
+    trước dưới /kaggle/working). Tránh shutil.SameFileError."""
     dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(require(name, roots, hint), dst)
-    print(f"  staged {name} -> {dst}")
+    if os.path.abspath(src) == os.path.abspath(dst):
+        return False
+    shutil.copy(src, dst)
+    return True
+
+
+def copy_in(name: str, dst: Path, roots: list[str], hint: str = "") -> None:
+    if _safe_copy(require(name, roots, hint), dst):
+        print(f"  staged {name} -> {dst}")
+    else:
+        print(f"  ok {name} (đã có sẵn tại {dst})")
 
 
 def copy_opt(name: str, dst: Path, roots: list[str]) -> bool:
     hit = find_one(name, roots)
     if not hit:
         return False
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(hit, dst)
-    print(f"  staged {name} -> {dst}")
+    if _safe_copy(hit, dst):
+        print(f"  staged {name} -> {dst}")
+    else:
+        print(f"  ok {name} (đã có sẵn tại {dst})")
     return True
 
 
@@ -176,7 +188,7 @@ def prepare_store(store_dst: Path, roots: list[str]) -> None:
     gz = find_one("reviews.jsonl.gz", roots)
     plain = find_one("reviews.jsonl", roots)
     if gz:
-        shutil.copy(gz, dst)
+        _safe_copy(gz, dst)
     elif plain:
         print("  nén reviews.jsonl -> .gz")
         with open(plain, "rb") as fi, gzip.open(dst, "wb") as fo:

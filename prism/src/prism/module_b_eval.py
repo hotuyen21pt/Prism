@@ -53,10 +53,13 @@ def main() -> None:
     tok = AutoTokenizer.from_pretrained(args.ckpt)
     model = AutoModelForSeq2SeqLM.from_pretrained(args.ckpt).to(device).eval()
 
-    # ngôn ngữ theo review (từ gold meta)
-    langs = {r["source_review_id"]: (r.get("languages") or ["?"])[0]
-             for r in U.read_jsonl(C.GOLD_META)}
     gold_rows = {r["instance_id"]: r for r in U.read_jsonl(args.gold_file)}
+    # Metadata is optional for portable Kaggle runs; split rows may carry it.
+    meta_rows = U.read_jsonl(C.GOLD_META) if C.GOLD_META.exists() else ()
+    langs = {r["source_review_id"]: (r.get("languages") or ["?"])[0]
+             for r in meta_rows}
+    langs.update({r["source_review_id"]: (r.get("languages") or ["?"])[0]
+                  for r in gold_rows.values() if r.get("languages")})
     rows = list(U.read_jsonl(args.test_file))
 
     preds: dict[str, list[dict]] = {}

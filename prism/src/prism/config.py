@@ -27,7 +27,8 @@ POOL_JSONL   = TABSA_ROOT / "data/raw/hotel_booking_unlabeled.jsonl"
 SPLIT_DIR    = TABSA_ROOT / "data/raw"                          # train/dev/test.jsonl
 GOLD_META    = _hamos_file(
     "metadata/reviews_with_dates.jsonl",
-    TABSA_ROOT / "data/raw/hotel_absa_labeled.jsonl",
+    _hamos_file("metadata/reviews.jsonl",
+                TABSA_ROOT / "data/raw/hotel_absa_labeled.jsonl"),
 )
 GOLD_QUADS   = _hamos_file("annotations/quads.jsonl")
 GOLD_SEGS    = _hamos_file("metadata/segments.jsonl")

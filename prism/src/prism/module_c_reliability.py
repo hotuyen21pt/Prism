@@ -117,8 +117,11 @@ def train_verifier() -> None:
     uniq = sorted({r["image"] for r in rows})
     feats: dict[str, "np.ndarray"] = {}
     for i, rel in enumerate(uniq):
+        p = C.HAMOS_ROOT / "data" / rel
+        if not p.exists():
+            p = C.HAMOS_ROOT / rel          # layout phẳng: hamos-mabsa/images/...
         try:
-            im = preprocess(Image.open(C.HAMOS_ROOT / "data" / rel).convert("RGB"))
+            im = preprocess(Image.open(p).convert("RGB"))
         except Exception:
             continue
         with torch.no_grad():

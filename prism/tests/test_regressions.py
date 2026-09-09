@@ -68,6 +68,25 @@ class TestSeparatorInTerm(unittest.TestCase):
         self.assertEqual(out[0]["taxonomy_code"], "EXP_VALUE")
         self.assertEqual(out[0]["sentiment"], "positive")
 
+    def test_term_equal_to_a_taxonomy_code(self):
+        """Term có thể TRÙNG một taxonomy_code. Nếu parse quét CODE2CAT thay vì đọc
+        theo vị trí thì sẽ thấy 2 ứng viên và bỏ cả quad — quad hoàn toàn hợp lệ."""
+        out = self._roundtrip("AM_POOL", "sạch")
+        self.assertEqual(len(out), 1, "aspect trùng code bị mất quad")
+        self.assertEqual(out[0]["aspect_term"], "AM_POOL")
+        out = self._roundtrip("phòng", "FAC_ROOM")
+        self.assertEqual(len(out), 1, "opinion trùng code bị mất quad")
+        self.assertEqual(out[0]["opinion_term"], "FAC_ROOM")
+
+    def test_escape_is_injective_on_sentinel_text(self):
+        """Term chứa đúng chuỗi escape phải round-trip nguyên vẹn: '&' được escape
+        ĐẦU TIÊN và unescape CUỐI CÙNG, nếu không 'a&#124;b' bị đọc thành 'a|b'."""
+        for s in ("a&#124;b", "giá & chất lượng", "&amp;", "&lt;quad&gt;", "a&b|c"):
+            out = self._roundtrip(s, s)
+            self.assertEqual(len(out), 1, s)
+            self.assertEqual(out[0]["aspect_term"], s, f"escape mất nội dung: {s!r}")
+            self.assertEqual(out[0]["opinion_term"], s)
+
     def test_still_drops_genuinely_malformed(self):
         self.assertEqual(parse_linearized("<quad> thiếu | trường </quad>"), [])
         self.assertEqual(parse_linearized("<quad> a | XX_BAD | b | positive </quad>"), [])
@@ -281,3 +300,92 @@ class TestImageValidation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSecondPassFixes(unittest.TestCase):
+    """Vòng review thứ 2 — lỗi phát hiện trong chính các bản sửa của vòng 1."""
+
+    @staticmethod
+    def _kp():
+        path = Path(__file__).resolve().parents[1] / "scripts" / "kaggle_pipeline.py"
+        spec = importlib.util.spec_from_file_location("kaggle_pipeline", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_find_ckpt_prefers_working_over_stale_input(self):
+        """find_ckpt khớp final_ckpt theo BASENAME sẽ lấy bản CŨ trong /kaggle/input
+        khi /kaggle/working có bản mới CÙNG TÊN — tình huống rất thường trên Kaggle."""
+        import tempfile
+        kp = self._kp()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for base in ("input/old-dataset/models", "working/models"):
+                d = root / base / "selftrain_round2"
+                d.mkdir(parents=True)
+                (d / "model.safetensors").write_bytes(b"x")
+                (d / "config.json").write_text("{}")
+            want = root / "working" / "models" / "selftrain_round2"
+            (root / "working" / "selftrain_history.json").write_text(
+                json.dumps({"final_ckpt": str(want), "final_dev_f1": 0.63}),
+                encoding="utf-8")
+            got = kp.find_ckpt([str(root / "input"), str(root / "working")])
+            self.assertIn("working", got.replace("\\", "/"),
+                          "phải lấy checkpoint trong /working, không phải bản cũ /input")
+
+    def test_find_ckpt_ranking_also_prefers_working(self):
+        """Đường fallback (không có history) cũng phải ưu tiên /working."""
+        import tempfile
+        kp = self._kp()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for base in ("input/old/models", "working/models"):
+                d = root / base / "selftrain_round1"
+                d.mkdir(parents=True)
+                (d / "model.safetensors").write_bytes(b"x")
+                (d / "config.json").write_text("{}")
+            got = kp.find_ckpt([str(root / "input"), str(root / "working")])
+            self.assertIn("working", got.replace("\\", "/"))
+
+    def test_filename_convention_matches_config(self):
+        """kaggle_pipeline KHÔNG import được prism.config (nó chạy trước khi stage
+        source), nên nó có bản sao quy ước tên file. Test này là thứ duy nhất giữ
+        hai bên không lệch — lệch tên = FileNotFoundError dù file có đó."""
+        kp = self._kp()
+        for cohort in ("T-unbiased", "corpus", "B-anchor"):
+            self.assertEqual(kp.POOL_NAME(cohort), C.pool_quads_name(cohort))
+            self.assertEqual(kp.VIMG_NAME(cohort), C.vimg_quads_name(cohort))
+        self.assertEqual(kp.AUDIT_NAME, C.HUMAN_AUDIT_NAME)
+        self.assertEqual(kp.AUDIT_NAME, C.AUDIT_SAMPLE_NAME)
+
+    def test_probe_reads_utf8(self):
+        """probe dùng io.open(..., encoding='utf-8'): open() trần crash
+        UnicodeDecodeError trên locale cp1252 của Windows."""
+        src = (Path(__file__).resolve().parents[1]
+               / "scripts" / "probe_complaint_composition.py").read_text(encoding="utf-8")
+        self.assertNotIn("open(QUADS)", src)
+        self.assertNotIn("open(POOL)", src)
+        self.assertIn("encoding='utf-8'", src)
+
+    def test_probe_uses_config_not_copies(self):
+        """probe không được khai báo lại WEST/ASIA/MIN_STRATUM."""
+        src = (Path(__file__).resolve().parents[1]
+               / "scripts" / "probe_complaint_composition.py").read_text(encoding="utf-8")
+        self.assertNotIn("WEST = {", src)
+        self.assertNotIn("ASIA = {", src)
+        self.assertIn("C.MIN_STRATUM_N", src)
+
+    def test_injection_reuses_one_shuffle_file(self):
+        """E4 lặp --repeats lần; mỗi bản quad là hàng trăm MB với corpus nên phải
+        DÙNG LẠI một file, không ghi ra mỗi lần lặp một file."""
+        import prism.eval_injection as EI
+        src = Path(EI.__file__).read_text(encoding="utf-8")
+        self.assertNotIn('quads_inj_shuffle_r{r_i}', src)
+        self.assertIn('"quads_inj_shuffle.jsonl.gz"', src)
+
+    def test_verifier_cache_is_bounded(self):
+        """Cache embedding ảnh phải có chặn trên (bản gốc giữ toàn bộ)."""
+        import prism.module_c_reliability as MC
+        src = Path(MC.__file__).read_text(encoding="utf-8")
+        self.assertIn("CACHE_MAX", src)
+        self.assertIn("popitem(last=False)", src)

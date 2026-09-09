@@ -129,6 +129,7 @@
   <div>§17 · Orchestrator Kaggle &amp; chuỗi notebook</div>
   <div>§18 · Môi trường: local · Docker · Kaggle</div>
   <div>§19 · Test, smoke test, bất biến, trạng thái &amp; việc còn thiếu</div>
+  <div>§20 · <b>Chạy trên Vast.ai — cấu hình cho kết quả khoa học nhất</b></div>
   <div class="g">Phụ lục</div>
   <div>A · Chỉ mục CLI đầy đủ</div>
   <div>B · Bản đồ file toàn repo</div>
@@ -2083,6 +2084,246 @@ docker compose run --rm module-b-data
   <tr><td>10</td><td>Cài <b>kênh semantic E<sub>a,t</sub></b> (opinion centroid, encoder đóng băng)</td><td>Phát hiện “vẫn chê nhưng lý do đổi” (opinion drift)</td><td><span class="badge p3">P3</span></td></tr>
   <tr><td>11</td><td>Chốt tần suất <b>lỗi rơi phủ định</b> trong gold (A9: 73 ca, 5 ca kiểm tay: 4 đúng / 1 sai)</td><td>Khai báo giới hạn dữ liệu</td><td><span class="badge p3">P3</span></td></tr>
 </table>
+
+<h2 class="pb">§20 · Chạy trên Vast.ai — cấu hình cho kết quả khoa học nhất <span class="badge new">mới</span></h2>
+<p class="sub">
+  Kaggle áp ba hạn chế lên pipeline: VRAM 16 GB (T4), phiên ~9–12 h, disk ~20 GB. Vast.ai bỏ cả ba.
+  Mục này tách rõ <b>cái gì đổi vì KẾT QUẢ đúng hơn</b> với <b>cái gì đổi chỉ vì phần cứng</b> —
+  và <b>cái gì Vast KHÔNG giải quyết được</b>.
+</p>
+
+<div class="item bad">
+  <div class="hd">Trước tiên: một lỗi cấu hình làm kiểm định KHÔNG THỂ dương tính</div>
+  <p>
+    Permutation test không cho p nhỏ hơn <b>f = 1/(n_perm+1)</b>. BH-FDR gán cho p ở hạng <i>k</i>
+    giá trị <b>q<sub>k</sub> = p<sub>k</sub>·m/k</b>, với m = số giả thuyết trong lưới.
+    Suy ra: q nhỏ nhất đạt được ở hạng k là <b>f·m/k</b>. Vậy để phát hiện được
+    <b>MỘT aspect drift đơn lẻ</b> (k=1) — đúng thứ mà E3c tiêm vào và đúng thứ paper muốn kết luận — cần
+  </p>
+  <div class="fx">
+    n_perm  ≥  m / α − 1
+    <span class="why">Với lưới chính: <span class="mono">--level taxonomy_code</span> cho tối đa <b>20 aspect</b>
+    (14 <span class="mono">CODES_REPORTABLE</span> + 6 bucket category cho 17 code hiếm), lưới adj =
+    π-adj ∪ ν-adj nên <b>m = 40</b> → <b>n_perm ≥ 799</b>.</span>
+  </div>
+  <p>Kiểm bằng chính <span class="mono">U.benjamini_hochberg</span>, m = 40, α = 0,05 — j = số aspect cùng drift:</p>
+  <table>
+    <tr><th><span class="mono">n_perm</span></th><th>p sàn</th><th>j=1 (đơn lẻ)</th><th>j=2</th><th>j=5</th><th>j=10</th></tr>
+    <tr><td>300 <span class="c">(mặc định CŨ của eval_injection)</span></td><td class="n">0,00332</td><td><b class="bad">CHẾT</b> q=0,133</td><td><b class="bad">CHẾT</b> q=0,066</td><td>OK q=0,027</td><td>OK q=0,013</td></tr>
+    <tr><td>800</td><td class="n">0,00125</td><td>OK q=0,050 <span class="c">(sát ngưỡng)</span></td><td>OK q=0,025</td><td>OK q=0,010</td><td>OK q=0,005</td></tr>
+    <tr><td>1000 <span class="c">(N_PERMUTATION hiện tại)</span></td><td class="n">0,00100</td><td>OK q=0,040 <span class="c">(biên 1,25×)</span></td><td>OK q=0,020</td><td>OK q=0,008</td><td>OK q=0,004</td></tr>
+    <tr><td><b>5000</b> <span class="c">(đề xuất cho Vast)</span></td><td class="n">0,00020</td><td><b>OK q=0,008</b></td><td>OK q=0,004</td><td>OK q=0,002</td><td>OK q=0,001</td></tr>
+  </table>
+  <p>
+    Hệ quả cụ thể: <b>E3c ở <span class="mono">--n-perm 300</span> không thể thành công</b> — nó tiêm drift vào
+    <i>đúng một</i> aspect (<span class="mono">AM_FOOD</span>), nên cột
+    <span class="mono">valence_detected_within_3</span> bị ép về <span class="mono">false</span> ở <b>mọi</b> δ,
+    không phải vì δ quá nhỏ mà vì số học. Nếu nó có dương tính thì là nhờ kênh π bị nhiễu kéo hạng BH lên —
+    tức nhờ đúng cái confound của §14.2, không phải nhờ bằng chứng ν.
+  </p>
+  <p>
+    <b>Đã sửa trong code</b>: mặc định <span class="mono">--n-perm</span> của <span class="mono">eval_injection</span>
+    nâng 300 → <span class="mono">C.N_PERMUTATION</span> (1000); và Module D nay tự kiểm, log
+    <span class="mono">ERROR</span> khi <span class="mono">f·m &gt; α</span> (với <span class="mono">--final</span> thì
+    <b>dừng hẳn</b>), đồng thời ghi <span class="mono">fdr_grid_size</span>, <span class="mono">p_perm_floor</span>,
+    <span class="mono">n_perm_min_for_grid</span>, <span class="mono">fdr_reachable_single_effect</span>,
+    <span class="mono">min_simultaneous_effects_detectable</span> vào JSON output. <b>Đọc mấy trường đó trước khi
+    tin <span class="mono">n_significant_after_fdr</span>.</b>
+  </p>
+</div>
+
+<h3>20.1 Đổi để KẾT QUẢ đúng hơn (thứ tự theo mức ảnh hưởng)</h3>
+<table>
+  <tr><th>#</th><th>Tham số</th><th>Kaggle</th><th>Vast</th><th>Vì sao đây là vấn đề KHOA HỌC, không phải tốc độ</th></tr>
+  <tr>
+    <td>1</td><td><span class="mono">--n-perm</span></td><td class="n">1000 (D) · 300 (inj)</td><td class="n"><b>5000</b></td>
+    <td>Xem hộp trên. 1000 chỉ hơn ngưỡng 799 khoảng 1,25× — nếu số aspect tăng lên 25 thì m=50 và
+        n_perm=1000 rơi đúng biên. 5000 cho p sàn 0,0002, dư biên và cho FDR đủ độ phân giải để <b>xếp hạng</b>
+        các aspect, không chỉ để cắt ngưỡng.</td>
+  </tr>
+  <tr>
+    <td>2</td><td><span class="mono">--n-boot</span></td><td class="n">0 (tắt)</td><td class="n"><b>1000</b></td>
+    <td>Mặc định đang TẮT bootstrap, nên <span class="mono">slope_ci95</span> không có trong output.
+        Paper báo slope mà không có CI là điểm reviewer nhắm ngay. Đây là bước CPU, Vast rẻ.</td>
+  </tr>
+  <tr>
+    <td>3</td><td>cohort của <span class="mono">infer</span></td><td class="n"><span class="mono">--limit 200000</span></td><td class="n"><b>bỏ <span class="mono">--limit</span></b></td>
+    <td>Đo được: corpus có <b>1.790.037 đơn vị</b> suy luận. Lấy 200k là <b>11%</b>. Bỏ <span class="mono">--limit</span>
+        thì hết cả phương sai lấy mẫu <i>và</i> hết mối lo mẫu lệch — kể cả sau khi đã đổi sang reservoir.</td>
+  </tr>
+  <tr>
+    <td>4</td><td><span class="mono">MAX_TGT_TOKENS</span></td><td class="n">192</td><td class="n"><b>448</b></td>
+    <td><b>Khử một thiên lệch đã biết</b> (§10.3): ở 192 token, unit từ ~9–10 quad bị truncate mất chính quad
+        đang rescore → <span class="mono">p_model</span> uniform → posterior thành prior thuần. Gold có segment tới
+        <b>23 quad</b> × ~17 token ≈ 390. Phải nâng cho <b>CẢ train VÀ infer</b> rồi <b>train lại</b> — model
+        train ở 192 sẽ không sinh quá 192 một cách đáng tin.</td>
+  </tr>
+  <tr>
+    <td>5</td><td><span class="mono">--model</span></td><td class="n"><span class="mono">mt5-small</span></td><td class="n"><b><span class="mono">mt5-base</span></b> → thử <span class="mono">mt5-large</span></td>
+    <td><span class="mono">mt5-small</span> là mặc định của <i>orchestrator Kaggle</i>, không phải của
+        <span class="mono">module_b_train</span> (vốn là <span class="mono">mt5-base</span>). Extractor tốt hơn → quad
+        tốt hơn → mọi số hạ nguồn tốt hơn. Ghi rõ model nào trong paper.</td>
+  </tr>
+  <tr>
+    <td>6</td><td>λ (<span class="mono">--lam</span>)</td><td class="n">0,7 đặt tay</td><td class="n"><b>quét trên dev</b></td>
+    <td>Đây là <b>việc còn treo #5 trong §16</b> của chính spec này. λ=0,7 chưa từng được chọn trên dev.
+        Quét λ ∈ {0,5 … 0,9} và chọn theo dev F1 sentiment — bỏ được một tham số đặt tay, tức bỏ một
+        chỗ reviewer bắt lỗi.</td>
+  </tr>
+  <tr>
+    <td>7</td><td>encoder Module C</td><td class="n"><span class="mono">ViT-B-32</span></td><td class="n"><b><span class="mono">ViT-L-14</span></b></td>
+    <td>Go/no-go của Module C gate trên <b>ΔAUC ≥ 0,05</b>. Với ViT-B-32, NO-GO có thể là do
+        <b>dung lượng encoder</b> chứ không phải do &ldquo;ảnh không mang tín hiệu&rdquo; — hai kết luận rất khác nhau
+        cho paper. Chạy cả hai và báo cáo ΔAUC của mỗi encoder mới là kiểm định công bằng.</td>
+  </tr>
+  <tr>
+    <td>8</td><td><span class="mono">--rounds</span></td><td class="n">2</td><td class="n"><b>3–4</b></td>
+    <td>An toàn <i>sau khi</i> đã sửa tiêu chí dừng (§9.2): vòng mới chỉ được nhận khi vượt dev F1 tốt nhất,
+        nên thêm vòng chỉ có thể tốt hơn hoặc dừng, không thể âm thầm xấu đi.</td>
+  </tr>
+  <tr>
+    <td>9</td><td>seed</td><td class="n">1 seed</td><td class="n"><b>3–5 seed</b></td>
+    <td>Chạy lại toàn Module D với <span class="mono">--seed</span> khác nhau và báo cáo độ tản của
+        <span class="mono">n_significant_after_fdr</span>. Rẻ (CPU) và trả lời trực tiếp câu &ldquo;kết quả có phải
+        do một lần bốc thăm may mắn không&rdquo;.</td>
+  </tr>
+</table>
+
+<h3>20.2 Đổi vì phần cứng (KHÔNG ảnh hưởng con số)</h3>
+<table>
+  <tr><th>Hạng mục</th><th>Hướng dẫn</th></tr>
+  <tr>
+    <td><span class="mono">--batch</span> /<br><span class="mono">--score-batch</span></td>
+    <td>Bắt đầu từ mặc định của module (<span class="mono">32</span> / <span class="mono">48</span>), <b>không</b> từ
+        override của Kaggle (<span class="mono">2</span> / <span class="mono">4</span>). <b>Ràng buộc VRAM nằm ở
+        <span class="mono">--score-batch</span></b>, không phải <span class="mono">--batch</span>: bước rescore dựng
+        <b>3n chuỗi</b> cho unit n quad, mỗi chuỗi dài n quad (§10.3). Cách hiệu chỉnh: chạy
+        <span class="mono">--limit 2000</span> và theo dõi <span class="mono">nvidia-smi</span>, tăng dần tới ~80% VRAM.
+        Đây là tham số duy nhất cần đo trên máy cụ thể — đừng chép số từ tài liệu.</td>
+  </tr>
+  <tr>
+    <td>Độ chính xác số</td>
+    <td><b>Giữ fp32 cho bước rescore.</b> fp16/bf16 làm đổi log-prob → đổi <span class="mono">p_model</span> →
+        đổi posterior → đổi <span class="mono">w</span>. Nếu muốn dùng half precision thì chỉ cho
+        <span class="mono">generate</span>, và phải ghi rõ trong paper là hai bước dùng độ chính xác khác nhau.</td>
+  </tr>
+  <tr>
+    <td>Disk</td>
+    <td>Đo được cho corpus: pool thô <b>1,5 GB</b> · store <b>179 MB</b> · <b>119.620</b> review có ảnh
+        (~<b>14 GB</b> nếu 120 KB/ảnh) · pool_quads corpus ~3,6M quad × 718 B ≈ 2,6 GB (nén ~0,6–0,8 GB) ·
+        checkpoint mỗi bản vài GB. <b>Cấp ≥ 80 GB</b> cho corpus + ảnh + vài checkpoint.</td>
+  </tr>
+  <tr>
+    <td>Tải ảnh</td>
+    <td>Bước <b>network-bound, không phải GPU</b>: corpus <b>119.620</b> ảnh @ <span class="mono">--sleep 0.4</span>
+        = <b>13,3 h</b> (T-unbiased: 13.039 ảnh = 1,4 h). Chạy <b>song song</b> với các bước GPU ngay từ đầu,
+        đừng để nó nằm trên đường găng. Có thể giảm <span class="mono">--sleep</span> nhưng phải lịch sự với CDN.</td>
+  </tr>
+  <tr>
+    <td>RAM</td>
+    <td><span class="mono">fit_bridge</span> nạp file quad vào RAM (đã thu gọn còn 11 trường, bỏ
+        <span class="mono">text</span>). Vẫn nên <b>fit bridge trên T-unbiased</b>, không phải corpus.
+        Cấp ≥ 32 GB RAM; 64 GB nếu muốn fit bridge trên corpus.</td>
+  </tr>
+  <tr>
+    <td>Không cần nữa</td>
+    <td>Không còn hạn mức phiên nên <span class="mono">--step all</span> chạy một lần là được. Cơ chế
+        sentinel/skip vẫn hữu ích khi một step lỗi giữa đường — và nay đã kiểm <b>file không rỗng</b> (§17.6).</td>
+  </tr>
+</table>
+
+<h3>20.3 Vast KHÔNG giải quyết được (vẫn chặn số cuối)</h3>
+<table>
+  <tr><th>Hạng mục</th><th>Chặn bởi</th><th>Cần gì</th></tr>
+  <tr><td>Khoá blocklist <span class="mono">(hotel,date)</span> (§5.2)</td><td>Thiếu dữ liệu</td>
+      <td><span class="mono">metadata/reviews_with_dates.jsonl</span> trong <span class="mono">hamos-mabsa</span>.
+          Không có thì <span class="mono">flag_gold_leak</span> = 1.466 thay vì 18.475 → <b>~17.000 dòng lẽ ra bị
+          chặn đang lọt vào training</b>. GPU mạnh hơn chỉ làm leakage lan nhanh hơn.</td></tr>
+  <tr><td>Probe E1c (§8.4)</td><td>Thiếu dữ liệu</td><td>Cùng file trên (0/10.711 segment có ngày)</td></tr>
+  <tr><td>D-a hiệu chỉnh recall (§13.2)</td><td>Thiếu annotation</td>
+      <td>Tập audit D0 (~300 review) → <span class="mono">recall_table.json</span> → <b>viết bước áp thật</b>.
+          <span class="mono">--final</span> hiện chặn đúng để không sinh số cuối chưa hiệu chỉnh.</td></tr>
+  <tr><td>Go/no-go Spearman của Module C (§12)</td><td>Thiếu annotation</td>
+      <td>300 quad audit người gán. Nhánh này <b>chưa chạy lần nào</b> trên dữ liệu thật.</td></tr>
+  <tr><td>Độ phân giải của E4 (§14.3)</td><td>Thiết kế</td>
+      <td>Với ~20 aspect thì lưới quá nhỏ để ước lượng FPR. n_perm lớn <b>không</b> sửa được;
+          cần nhiều cohort/level hoặc bootstrap ở mức aspect.</td></tr>
+</table>
+
+<h3>20.4 Lệnh chạy đề xuất trên Vast (corpus, số cuối)</h3>
+<pre><span class="c">########## 0. môi trường ##########</span>
+export PRISM_TABSA_ROOT=/workspace/Prism/prism
+export PRISM_HAMOS_ROOT=/workspace/hamos-mabsa
+export PRISM_WORK_DIR=/workspace/outputs
+export PRISM_MODEL_DIR=/workspace/models
+export PYTHONPATH=$PRISM_TABSA_ROOT/src
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+pip install -r requirements.txt          <span class="c"># có chặn trên version</span>
+pip freeze &gt; requirements.lock.txt       <span class="c"># FREEZE rồi commit — artifact của paper</span>
+python -m unittest discover tests        <span class="c"># 70 test, ~0,15 s</span>
+python -m prism.smoke_test               <span class="c"># PHẢI PASS trước khi tốn GPU</span>
+
+<span class="c">########## 1. tải ảnh — chạy SONG SONG ngay từ đầu (13 h, không dùng GPU) ##########</span>
+nohup python scripts/download_pool_photos.py --cohort corpus --limit 0 &gt; photos.log 2&amp;&gt;1 &amp;
+
+<span class="c">########## 2. store + data (CPU) ##########</span>
+python -m prism.module_a_store
+<span class="c"># KIỂM: store_report.json -&gt; blocklist_date_key_active phải là true</span>
+python -m prism.module_b_data
+
+<span class="c">########## 3. train seed (GPU) — mt5-base, token limit đã nâng ##########</span>
+<span class="c"># Nâng MAX_SRC/MAX_TGT_TOKENS trong config.py lên 160/448 TRƯỚC khi train</span>
+python -m prism.module_b_train --model google/mt5-base --epochs 10    --batch 8 --grad-accum 4
+python -m prism.module_b_eval --ckpt models/seed_extractor
+
+<span class="c">########## 4. quét λ trên dev (bỏ tham số đặt tay) ##########</span>
+for LAM in 0.5 0.6 0.7 0.8 0.9; do
+  python -m prism.module_b_infer --ckpt models/seed_extractor --cohort B-anchor      --limit 20000 --lam $LAM --sample-seed 1
+  <span class="c"># chấm sentiment F1 trên dev, giữ λ tốt nhất</span>
+done
+
+<span class="c">########## 5. self-train (GPU) ##########</span>
+python -m prism.module_b_selftrain --rounds 4 --cohort B-anchor    --batch 32 --score-batch 48 --infer-limit 400000
+
+<span class="c">########## 6. infer TOÀN CORPUS — không --limit (GPU, bước dài nhất) ##########</span>
+python -m prism.module_b_infer --ckpt models/selftrain_round&lt;N&gt; --cohort corpus    --batch 32 --score-batch 48 --lam &lt;λ đã quét&gt;
+<span class="c"># KIỂM log: tỷ lệ p_model_truncated phải ~0 sau khi nâng MAX_TGT_TOKENS</span>
+
+<span class="c">########## 7. Module C — chạy CẢ HAI encoder để ΔAUC là kiểm định công bằng ##########</span>
+python -m prism.module_c_reliability --stage train_verifier   <span class="c"># ViT-B-32</span>
+<span class="c"># rồi đổi model_name -&gt; ViT-L-14, chạy lại, so ΔAUC của hai bản</span>
+python -m prism.module_c_reliability --stage apply_verifier --cohort T-unbiased
+python -m prism.module_c_reliability --stage bridge --cohort T-unbiased    --audit outputs/reliability/audit_sample_300.jsonl
+python -m prism.module_c_reliability --stage apply --cohort corpus
+
+<span class="c">########## 8. Module D — số cuối. --final chặn nếu D-a còn stub ##########</span>
+python -m prism.module_d_drift --quads outputs/reliability/quads_weighted.jsonl.gz    --level taxonomy_code --cohort corpus    --n-perm 5000 --n-boot 1000 --final
+<span class="c"># KIỂM output: fdr_reachable_single_effect=true · recall_adjusted=true</span>
+
+<span class="c">########## 9. cohort không thiên vị + độ tản theo seed ##########</span>
+python -m prism.module_d_drift --quads outputs/reliability/quads_weighted.jsonl.gz    --level taxonomy_code --cohort T-unbiased --n-perm 5000 --n-boot 1000
+for S in 1 2 3 4 5; do
+  python -m prism.module_d_drift --quads outputs/reliability/quads_weighted.jsonl.gz      --cohort corpus --n-perm 5000 --seed $S --out outputs/drift/seed_$S.json
+done
+
+<span class="c">########## 10. injection &amp; negative control — n-perm ĐỦ cho lưới ##########</span>
+Q=outputs/reliability/quads_weighted.jsonl.gz
+python -m prism.eval_injection --quads $Q --test composition --n-perm 5000
+python -m prism.eval_injection --quads $Q --test valence     --n-perm 5000
+python -m prism.eval_injection --quads $Q --test shuffle     --n-perm 5000 --repeats 10</pre>
+
+<div class="item keep">
+  <div class="hd">Thứ tự ưu tiên nếu ngân sách GPU có hạn</div>
+  <p>
+    <b>Rẻ mà ảnh hưởng lớn nhất (chỉ CPU):</b> #1 <span class="mono">--n-perm 5000</span> ·
+    #2 <span class="mono">--n-boot 1000</span> · #9 nhiều seed. Ba cái này không tốn GPU nào và sửa
+    đúng chỗ dễ bị chất vấn nhất về mặt thống kê.<br>
+    <b>Tốn GPU, đáng nhất:</b> #4 nâng <span class="mono">MAX_TGT_TOKENS</span> + train lại (khử thiên lệch đã biết)
+    → #3 infer toàn corpus → #5 <span class="mono">mt5-base</span>.<br>
+    <b>Chỉ khi đã có annotation:</b> #7 encoder Module C — không có 300 quad audit thì go/no-go vẫn không chấm được
+    dù encoder tốt đến đâu.
+  </p>
+</div>
 
 <h2 class="pb">Phụ lục A · Chỉ mục CLI đầy đủ</h2>
 <pre><span class="c">########## Kiểm tra trước tiên ##########</span>

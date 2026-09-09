@@ -12,7 +12,7 @@ tính khả thi TRƯỚC khi đầu tư vào ASQP extractor. Pipeline thật ch�
 
 Chạy:  python3 scripts/probe_complaint_composition.py
 """
-import json, re, math, pickle, collections, os
+import io, json, re, math, pickle, collections, os
 from pathlib import Path
 import statistics as s
 
@@ -68,7 +68,9 @@ bloc = U.country_bloc
 def build_lexicon():
     """term -> code, chỉ giữ term có code trội >=60% và >=3 lần trong gold."""
     tc = collections.defaultdict(collections.Counter)
-    for line in open(QUADS):
+    # encoding='utf-8' BẮT BUỘC: console/locale Windows mặc định cp1252 làm
+    # open() không đọc được text tiếng Việt -> UnicodeDecodeError ngay dòng đầu.
+    for line in io.open(QUADS, encoding='utf-8'):
         q = json.loads(line)
         a = q.get('aspect_term')
         if not a: continue
@@ -91,7 +93,7 @@ def scan(pat):
     negS = collections.defaultdict(collections.Counter)   # (month, stratum) -> code
     strn = collections.defaultdict(collections.Counter)   # month -> stratum
     nrev = collections.Counter()
-    for line in open(POOL):
+    for line in io.open(POOL, encoding='utf-8'):
         d = json.loads(line)
         m = re.search(r'ngày (\d+) tháng (\d+) năm (\d{4})', d.get('review_date') or '')
         if not m: continue

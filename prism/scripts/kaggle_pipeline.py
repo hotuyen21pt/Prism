@@ -171,18 +171,36 @@ def find_ckpt(roots: list[str]) -> str | None:
         return None
     dirs = sorted(set(dirs))
 
+    def _prefer(cands: list[str]) -> str:
+        """Nhiều thư mục cùng tên: ưu tiên /kaggle/working (output step trước trong
+        cùng session) rồi tới bản MỚI NHẤT. Khớp theo basename một mình là chưa đủ —
+        trên Kaggle rất thường có dataset CŨ trong /input và output MỚI trong
+        /working mang ĐÚNG cùng tên, và sorted() theo chữ thì /input thắng."""
+        if len(cands) > 1:
+            print(f"  [!] {len(cands)} thư mục cùng tên, ưu tiên /working + mới nhất:")
+            for c in cands:
+                print(f"      {c}")
+        return sorted(cands, key=lambda d: ("working" not in d.replace("\\", "/"),
+                                            -os.path.getmtime(d)))[0]
+
     # (1) tin selftrain_history.json trước tiên
     hist = find_one("selftrain_history.json", roots)
     if hist:
         try:
             with open(hist, encoding="utf-8") as f:
                 h = json.load(f)
-            want = os.path.basename(str(h.get("final_ckpt") or ""))
-            for d in dirs:
-                if want and os.path.basename(d) == want:
-                    print(f"  ckpt theo selftrain_history.json: {d} "
-                          f"(dev F1 = {h.get('final_dev_f1')})")
-                    return d
+            want_path = str(h.get("final_ckpt") or "")
+            want = os.path.basename(want_path)
+            # khớp ĐƯỜNG DẪN ĐẦY ĐỦ trước — chính xác nhất khi chạy cùng session
+            exact = [d for d in dirs
+                     if os.path.normpath(d) == os.path.normpath(want_path)]
+            same_name = [d for d in dirs if want and os.path.basename(d) == want]
+            hit = exact or same_name
+            if hit:
+                d = _prefer(hit)
+                print(f"  ckpt theo selftrain_history.json: {d} "
+                      f"(dev F1 = {h.get('final_dev_f1')})")
+                return d
             if want:
                 print(f"  [!] selftrain_history.json trỏ tới '{want}' nhưng không "
                       f"thấy thư mục đó trong input — rơi về xếp hạng theo tên")
@@ -197,6 +215,7 @@ def find_ckpt(roots: list[str]) -> str | None:
             -(int(m.group(1)) if m else -1),         # round LỚN NHẤT trước
             "module-b-train" not in d.lower(),
             "seed_extractor" not in d.lower(),
+            "working" not in d.replace("\\", "/"),   # /working trước /input
             -os.path.getmtime(d),                    # mới nhất trước
         )
 

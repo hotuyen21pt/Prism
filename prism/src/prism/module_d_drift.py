@@ -381,6 +381,37 @@ def run(args) -> None:
     apply_fdr(adj_entries)
     apply_fdr(raw_entries)
 
+    # ------------------------------------------------ n_perm có ĐỦ CHO LƯỚI FDR?
+    # Permutation test không cho p nhỏ hơn f = 1/(n_perm+1). BH gán cho p ở hạng k
+    # giá trị q_k = p_k·m/k (m = số giả thuyết trong lưới). Vậy q nhỏ nhất đạt được
+    # ở hạng k là f·m/k — NGƯỠNG PHỤ THUỘC SỐ HIỆU ỨNG THẬT, không phải hằng số:
+    #
+    #   • 1 aspect drift ĐƠN LẺ (k=1): cần f·m <= alpha  <=>  n_perm >= m/alpha - 1
+    #   • j aspect cùng drift (k=j)  : cần f·m/j <= alpha (dễ hơn j lần)
+    #
+    # Nên n_perm nhỏ KHÔNG chặn mọi phát hiện — nó chặn đúng trường hợp quan trọng
+    # nhất và khó nhất: MỘT aspect trôi giữa nhiều aspect phẳng. Và vì j không biết
+    # trước, phải chuẩn bị cho k=1.
+    m_adj = len(adj_entries)
+    p_floor = 1.0 / (args.n_perm + 1)
+    n_perm_min = int(math.ceil(m_adj / args.fdr)) - 1 if m_adj else 0
+    # j nhỏ nhất còn phát hiện được với cấu hình hiện tại
+    min_j = int(math.ceil(p_floor * m_adj / args.fdr)) if m_adj else 0
+    fdr_reachable_single = bool(m_adj) and p_floor * m_adj <= args.fdr
+    if m_adj and not fdr_reachable_single:
+        msg = (f"--n-perm {args.n_perm} quá nhỏ cho lưới FDR m={m_adj}: p sàn "
+               f"{p_floor:.5f}, nên q nhỏ nhất ở hạng 1 là {p_floor * m_adj:.4f} > "
+               f"alpha={args.fdr}. Hệ quả: MỘT aspect drift đơn lẻ KHÔNG THỂ vượt FDR "
+               f"(chỉ phát hiện được khi có >= {min_j} aspect cùng drift). "
+               f"Cần --n-perm >= {n_perm_min} để phát hiện được hiệu ứng đơn lẻ.")
+        if getattr(args, "final", False):
+            raise SystemExit(msg)
+        log.error(msg)
+    elif m_adj and args.n_perm < 2 * n_perm_min:
+        log.warning("--n-perm %d chỉ hơn ngưỡng tối thiểu (%d) %.1f× cho lưới m=%d — "
+                    "biên mỏng, tăng n_perm để p có độ phân giải cho xếp hạng FDR",
+                    args.n_perm, n_perm_min, args.n_perm / max(n_perm_min, 1), m_adj)
+
     def sig(row, tag):
         st = row.get(tag)
         return bool(st and st.get("significant_after_fdr"))
@@ -417,6 +448,12 @@ def run(args) -> None:
                        # p_perm/p_fdr là kiểm định TREND; bước nhảy ở p_perm_changepoint
                        "test_statistic": "ols_trend_t (permutation, null riêng từng chuỗi)",
                        "recall_adjusted": recall_adjusted,
+                       # Chẩn đoán lưới FDR — đọc TRƯỚC khi tin n_significant_*
+                       "fdr_grid_size": m_adj,
+                       "p_perm_floor": round(p_floor, 6),
+                       "n_perm_min_for_grid": n_perm_min,
+                       "fdr_reachable_single_effect": fdr_reachable_single,
+                       "min_simultaneous_effects_detectable": min_j,
                        "n_significant_after_fdr": n_sig,
                        "n_significant_valence_fdr": n_sig_val,
                        "results": results})

@@ -22,8 +22,16 @@ TASK_PREFIX = "extract quads: "
 
 # Ký tự phân cách PHẢI được escape trong nội dung term, nếu không quad bị mất trắng:
 # aspect_term "giá | chất lượng" sinh ra 5 field -> parse_linearized bỏ cả quad im lặng.
-# Escape ở cả hai chiều để round-trip là song ánh với mọi nội dung term.
-_ESCAPES = ((QUAD_OPEN, "&lt;quad&gt;"), (QUAD_CLOSE, "&lt;/quad&gt;"), ("|", "&#124;"))
+#
+# THỨ TỰ QUAN TRỌNG: '&' phải được escape ĐẦU TIÊN và unescape CUỐI CÙNG, nếu không
+# một term chứa đúng chuỗi "&#124;" sẽ bị unescape thành "|" -> round-trip không còn
+# song ánh (mất nội dung gốc mà không có dấu hiệu gì).
+_ESCAPES = (
+    ("&", "&amp;"),                       # phải đứng đầu
+    ("|", "&#124;"),
+    (QUAD_OPEN, "&lt;quad&gt;"),
+    (QUAD_CLOSE, "&lt;/quad&gt;"),
+)
 
 
 def esc_term(s: str) -> str:
@@ -33,7 +41,7 @@ def esc_term(s: str) -> str:
 
 
 def unesc_term(s: str) -> str:
-    for raw, safe in _ESCAPES:
+    for raw, safe in reversed(_ESCAPES):   # '&' cuối cùng
         s = s.replace(safe, raw)
     return s
 
@@ -56,21 +64,34 @@ def parse_linearized(s: str) -> list[dict]:
         fields = [f.strip() for f in body.split("|")]
         if len(fields) < 4:
             continue
-        # Target của ta luôn có đúng 4 field (term đã escape). Nhưng model TỰ SINH
-        # có thể chèn '|' thô vào term -> >4 field. Thay vì bỏ cả quad (mất recall
-        # lệch theo loại term, không lệch theo aspect nên không hiện ở bảng nào),
-        # neo vào hai field xác định được: sentiment là field CUỐI, taxonomy_code là
-        # field duy nhất thuộc CODE2CAT. Phần trước code = aspect, phần giữa = opinion.
-        sent = fields[-1]
-        code_at = [i for i, f in enumerate(fields[:-1]) if f in C.CODE2CAT]
-        if len(code_at) != 1 or sent not in C.SENTIMENTS:
-            continue    # taxonomy hard filter ngay tại parse
-        ci = code_at[0]
-        code = fields[ci]
-        a = unesc_term(" | ".join(fields[:ci]).strip())
-        o = unesc_term(" | ".join(fields[ci + 1:-1]).strip())
+        if len(fields) == 4:
+            # ĐƯỜNG CHUẨN — đọc theo VỊ TRÍ. Target do linearize sinh ra luôn có
+            # đúng 4 field (term đã escape), nên mọi target của ta đi đường này.
+            # Phải đọc theo vị trí chứ không quét CODE2CAT: term có thể TRÙNG một
+            # taxonomy_code (aspect_term = "AM_POOL") -> quét sẽ thấy 2 ứng viên và
+            # bỏ cả quad, dù quad hoàn toàn hợp lệ.
+            a, code, o, sent = fields
+        else:
+            # ĐƯỜNG CỨU HỘ — model TỰ SINH chèn '|' thô vào term (>4 field). Thay vì
+            # bỏ cả quad (mất recall lệch theo LOẠI TERM, không lệch theo aspect nên
+            # không hiện ở bảng by_category nào), neo vào hai field xác định được:
+            # sentiment là field CUỐI, taxonomy_code là field duy nhất thuộc CODE2CAT.
+            sent = fields[-1]
+            code_at = [i for i, f in enumerate(fields[:-1]) if f in C.CODE2CAT]
+            if len(code_at) != 1:
+                continue        # không xác định được vị trí code -> bỏ
+            ci = code_at[0]
+            code = fields[ci]
+            a = " | ".join(fields[:ci]).strip()
+            o = " | ".join(fields[ci + 1:-1]).strip()
+        # TAXONOMY HARD FILTER — áp cho CẢ HAI đường. Đây là bất biến mà Module D
+        # dựa vào (load_quads tra CODE2CAT), nên không được để rơi ở nhánh nào:
+        # thiếu nó thì code lạ đi tiếp và nổ KeyError ở dòng aspect_category.
+        if code not in C.CODE2CAT or sent not in C.SENTIMENTS:
+            continue
+        a, o = unesc_term(a), unesc_term(o)
         if not a or not o:
-            continue    # thiếu hẳn vị trí aspect hoặc opinion -> quad hỏng
+            continue    # vị trí aspect/opinion rỗng hẳn -> quad hỏng (phải là NULL)
         out.append({
             "aspect_term": None if a == NULL else a,
             "taxonomy_code": code,

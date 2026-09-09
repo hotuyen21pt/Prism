@@ -103,7 +103,7 @@ def inject_shuffle(quads, rng):
     return [dict(q, period=remap[q["review_uid"]]) for q in quads]
 
 
-def run_drift(quad_file, tag, n_perm=300, out_dir=None):
+def run_drift(quad_file, tag, n_perm=C.N_PERMUTATION, out_dir=None):
     out = U.Path(out_dir or C.DRIFT_DIR) / f"drift_results.{tag}.json"
     subprocess.run([sys.executable, "-m", "prism.module_d_drift",
                     "--quads", str(quad_file), "--level", "taxonomy_code",
@@ -126,7 +126,12 @@ def main() -> None:
     ap.add_argument("--t0", default="2023-09")
     ap.add_argument("--repeats", type=int, default=5,
                     help="số lần lặp shuffle (E4) với seed khác nhau")
-    ap.add_argument("--n-perm", type=int, default=300)
+    ap.add_argument("--n-perm", type=int, default=C.N_PERMUTATION,
+                    help="PHẢI >= m/alpha - 1 với m = số giả thuyết trong lưới FDR "
+                         "(m = 2 x số aspect), nếu không một hiệu ứng ĐƠN LẺ như "
+                         "injection của E3c không thể vượt FDR: q hạng-1 = p_sàn x m "
+                         "và p_sàn = 1/(n_perm+1). Với 20 aspect -> m=40 -> cần >=799. "
+                         "Mặc định cũ 300 là KHÔNG đủ cho lưới thật.")
     ap.add_argument("--seed", type=int, default=C.RANDOM_SEED)
     ap.add_argument("--out-dir", default=None,
                     help="thư mục output; mặc định outputs/drift. Smoke test PHẢI "
@@ -189,7 +194,9 @@ def main() -> None:
         for r_i in range(args.repeats):
             rng_i = random.Random(args.seed + r_i)
             inj = inject_shuffle(quads, rng_i)
-            f = dump(inj, out_dir / f"quads_inj_shuffle_r{r_i}.jsonl.gz")
+            # MỘT file dùng lại cho mọi lần lặp: với corpus mỗi bản là hàng trăm MB
+            # và /kaggle/working chỉ có ~20 GB. Chỉ report JSON là tách theo lần lặp.
+            f = dump(inj, out_dir / "quads_inj_shuffle.jsonl.gz")
             res = run_drift(f, f"inj_shuffle_r{r_i}", args.n_perm, out_dir)
             n_tests = sum(1 for r in res["results"]
                           for t in ("adj", "val_adj")

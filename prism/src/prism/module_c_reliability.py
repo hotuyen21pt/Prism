@@ -274,16 +274,22 @@ def apply_verifier(quad_file, image_index_file, out_file) -> None:
     cat_idx = {c: i for i, c in enumerate(C.CATEGORIES)}
 
     index = json.loads(U.Path(image_index_file).read_text())
-    # Cache CHỈ giữ embedding của review đang xử lý: quad của cùng review nằm liền
-    # nhau trong file, nên cache 1 phần tử là đủ. Cache toàn bộ (bản cũ) giữ vài
-    # trăm MB embedding cho corpus mà không dùng lại lần nào.
-    cache: dict[str, object] = {}
+    # Cache LRU nhỏ, KHÔNG cache toàn bộ: bản cũ giữ mọi embedding review đã gặp,
+    # tức vài trăm MB cho corpus mà gần như không dùng lại.
+    # Vì sao 256 chứ không phải 1: quad của cùng review thường liền nhau, nhưng
+    # hai unit (POS/NEG) của một review có thể bị TÁCH RA khi module_b_infer chạy
+    # với --limit (reservoir sampling có shuffle). Cache 1 phần tử sẽ embed lại ảnh
+    # đó lần thứ hai; 256 phần tử (~0,5 MB) là đủ và vẫn có chặn trên.
+    CACHE_MAX = 256
+    cache: "collections.OrderedDict[str, object]" = collections.OrderedDict()
     stats = collections.Counter()
 
     def embed(uid: str):
         if uid in cache:
+            cache.move_to_end(uid)
             return cache[uid]
-        cache.clear()
+        while len(cache) >= CACHE_MAX:
+            cache.popitem(last=False)
         try:
             im = preprocess(Image.open(index[uid]).convert("RGB"))
         except Exception as e:
@@ -340,8 +346,15 @@ def fit_bridge(quad_file, audit_file=None) -> None:
     from sklearn.linear_model import LogisticRegression
     from scipy.stats import spearmanr
 
-    quads = [q for q in U.read_jsonl(quad_file)]
+    # Chỉ giữ TRƯỜNG CẦN DÙNG, không giữ cả dòng: trường `text` chiếm phần lớn dung
+    # lượng mỗi quad và fit_bridge không dùng nó. Nạp cả dòng (bản cũ) tốn ~4,3 GB
+    # cho corpus (~3,6M quad × ~1,2 KB) — sát hạn mức RAM của Kaggle.
+    _KEEP = ("conf_seq", "p_posterior", "phi", "n_words", "provenance_flip",
+             "score", "has_photo", "v_image",
+             "review_uid", "taxonomy_code", "opinion_term")   # 3 cái cuối: quad_uid
+    quads = [{k: q[k] for k in _KEEP if k in q} for q in U.read_jsonl(quad_file)]
     with_v = [q for q in quads if "v_image" in q]
+    log.info("nạp %d quad (%d có v_image) từ %s", len(quads), len(with_v), quad_file)
     if not with_v:
         log.error("chưa có v_image — chạy stage apply-verifier trên pool có ảnh trước")
         return

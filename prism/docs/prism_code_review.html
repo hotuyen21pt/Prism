@@ -38,18 +38,21 @@
 <body>
 
 <h1>PRISM — Review code toàn pipeline</h1>
-<p class="sub">Review nội bộ + <b>đã áp dụng sửa</b> · commit gốc <span class="mono">7f5bc5d</span> (2026-09-08) · phạm vi: <span class="mono">prism/src/prism/*</span> · <span class="mono">prism/scripts/*</span> · <span class="mono">prism/tests/*</span> · Docker + repo hygiene · 28 hạng mục</p>
+<p class="sub">Review nội bộ + <b>đã áp dụng sửa</b> · commit gốc <span class="mono">7f5bc5d</span> (2026-09-08) · phạm vi: <span class="mono">prism/src/prism/*</span> · <span class="mono">prism/scripts/*</span> · <span class="mono">prism/tests/*</span> · Docker + repo hygiene · 35 hạng mục (2 vòng)</p>
 
 <p class="lead">
 Khung pipeline <b>đúng và chắc</b>: tách 4 module rõ ràng, provenance posterior dùng
 <span class="mono">P_model</span> thật qua teacher forcing (không one-hot), shrinkage thay cho loại-ô-nhỏ ở cả hai
 kênh π/ν, permutation null riêng từng chuỗi + BH-FDR. Không hạng mục nào đòi viết lại.<br><br>
-<b>TRẠNG THÁI: đã sửa toàn bộ 24 hạng mục của bản review đầu, cộng 4 hạng mục phát hiện
-thêm trong lúc sửa (#25–#28).</b> Test: <b>61/61 PASS</b> — 37 test cũ giữ nguyên xanh, cộng 24 test
+<b>TRẠNG THÁI: đã sửa 24 hạng mục vòng 1, 4 hạng mục phát hiện trong lúc sửa (#25–#28), và
+7 hạng mục của VÒNG REVIEW THỨ 2 (#29–#35) — trong đó <span style="color:#b91c1c">6 lỗi là do chính bản sửa vòng 1 gây ra</span>.</b>
+Test: <b>70/70 PASS</b> — 37 test cũ giữ nguyên xanh, cộng 24 test
 hồi quy mới trong <span class="mono">tests/test_regressions.py</span> (trước đây <i>không test nào</i> bắt được #4, #6, #8, #9).
 Verify trên dữ liệu thật: Module A chạy lại cho cohort <b>khớp tuyệt đối</b> 270/1.207/514/10.629;
 Module B-data round-trip 23.995 quad, 0 mismatch; Module D end-to-end khôi phục đúng trend đã
-tiêm (ν-adj t=+11,19 q=0,007 cho aspect có drift · t=0,56 q=0,602 cho aspect phẳng).<br><br>
+tiêm (ν-adj t=+11,19 q=0,007 cho aspect có drift · t=0,56 q=0,602 cho aspect phẳng); và
+<b><span class="mono">smoke_test</span> chạy trọn: PASS</b> — <span class="mono">23.995 quad roundtrip clean · ν bắt trend AM_FOOD
+t=+11,0 q=0,017 · 3 aspect phẳng im lặng · E4 FPR=0,0</span>.<br><br>
 Hai hạng mục <b>chưa đóng được bằng code</b> vì thiếu dữ liệu — xem <i>Còn treo</i>: D-a hiệu chỉnh
 recall (cần tập audit D0) và khoá blocklist theo ngày (cần <span class="mono">reviews_with_dates.jsonl</span> trong repo
 <span class="mono">hamos-mabsa</span>). Cả hai giờ báo lỗi tường minh thay vì im lặng.
@@ -87,6 +90,14 @@ recall (cần tập audit D0) và khoá blocklist theo ngày (cần <span class=
   <tr><td>#26</td><td>Probe E1c chưa từng chạy được: 0/10.711 segment có <span class="mono">review_date</span></td><td>module_b_data</td><td><span class="badge p1">P1</span></td><td><span class="badge todo">Cần dữ liệu</span></td></tr>
   <tr><td>#27</td><td>Sentinel coi file <b>rỗng</b> là output hợp lệ &rarr; <span class="mono">all</span> bỏ qua infer</td><td>kaggle_pipeline</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
   <tr><td>#28</td><td>Rescore bị truncate &rarr; <span class="mono">p_model</span> uniform &rarr; posterior = prior thuần</td><td>module_b_infer</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td colspan="5" style="background:#fef2f2;font-weight:700">VÒNG REVIEW 2 — #29–#34 là lỗi do chính bản sửa vòng 1 gây ra (Phần B3)</td></tr>
+  <tr><td>#29</td><td><b>Mất taxonomy hard-filter</b> ở đường 4-field &rarr; <span class="mono">KeyError</span></td><td>module_b_data</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#30</td><td>Quét <span class="mono">CODE2CAT</span> làm mất quad khi term <b>trùng một code</b></td><td>module_b_data</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#31</td><td>Escape <b>không song ánh</b>: term chứa <span class="mono">&amp;#124;</span> bị đọc thành <span class="mono">|</span></td><td>module_b_data</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#32</td><td><span class="mono">find_ckpt</span> khớp basename &rarr; lấy bản CŨ <span class="mono">/input</span> thay vì <span class="mono">/working</span></td><td>kaggle_pipeline</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#33</td><td>E4 ghi 5 file quad thay vì dùng lại 1 &rarr; 5&times; disk</td><td>eval_injection</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#34</td><td>Cache ảnh 1 phần tử &rarr; embed lại 2&times; khi infer chạy <span class="mono">--limit</span></td><td>module_c</td><td><span class="badge p3">P3</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#35</td><td><b>Smoke test chưa từng kiểm kênh ν</b> (mọi quad tổng hợp là negative)</td><td>smoke_test</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
 </table>
 
 <h2>Phần A — Đường găng ra số của paper</h2>
@@ -530,6 +541,111 @@ recall (cần tập audit D0) và khoá blocklist theo ngày (cần <span class=
     process giữa pipeline. Kaggle vốn UTF-8 nên bug này chỉ hiện ở local.</div></div>
   <div class="row"><div class="k">Đã sửa</div><div><span class="mono">reconfigure(encoding="utf-8", errors="replace")</span> cho stdout/stderr, gọi lúc
     import <span class="mono">prism.utils</span> và ở đầu orchestrator — mất dấu chứ không mất run.</div></div>
+</div>
+
+<h2>Phần B3 — Vòng review thứ 2: lỗi trong chính bản sửa</h2>
+<p class="sub">Sáu trong bảy hạng mục dưới đây do vòng sửa thứ nhất gây ra. Đây là lý do một bản review phải được review lại.</p>
+
+<div class="item">
+  <div class="hd">#29 — Mất taxonomy hard-filter ở đường 4-field <span class="badge p1">P1</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_b_data.parse_linearized</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Khi viết lại parse cho #8, tôi chuyển kiểm <span class="mono">code not in CODE2CAT</span> vào
+    <b>chỉ</b> nhánh cứu hộ, làm đường 4-field (đường mà <i>mọi</i> target của ta đi qua) không còn lọc taxonomy.
+    Hệ quả trực tiếp: <span class="mono">KeyError: 'XX_BAD'</span> ở dòng <span class="mono">aspect_category</span>.
+    Nặng hơn: đây là bất biến mà <span class="mono">module_d.load_quads</span> dựa vào — chính cái bất biến
+    hạng mục #23 nói tới.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Đưa hard-filter ra <b>sau cả hai nhánh</b>, áp một lần cho cả hai.
+    <b>Test cũ bắt được lỗi này</b> (<span class="mono">test_invalid_code_and_sentiment_dropped</span>) — bằng chứng
+    cụ thể rằng bộ test cũ có giá trị và không được nới lỏng khi refactor.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#30 — Quét <span class="mono">CODE2CAT</span> làm mất quad khi term trùng một code <span class="badge p1">P1</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_b_data.parse_linearized</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Bản sửa #8 xác định vị trí code bằng cách <b>quét</b> field nào thuộc
+    <span class="mono">CODE2CAT</span>. Nếu <span class="mono">aspect_term</span> hoặc <span class="mono">opinion_term</span>
+    <b>trùng một taxonomy code</b> (ví dụ aspect là chuỗi <span class="mono">"AM_POOL"</span>) thì có 2 ứng viên →
+    <span class="mono">len(code_at) != 1</span> → <b>bỏ cả quad</b>, dù quad hoàn toàn hợp lệ và bản gốc parse đúng.
+    Tức là tôi đã đổi một lớp silent-drop thành một lớp silent-drop khác.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Đọc <b>theo VỊ TRÍ trước</b> (<span class="mono">len(fields) == 4</span> →
+    <span class="mono">a, code, o, sent = fields</span>) — giống hệt bản gốc, nên mọi target của ta đi đường này.
+    Quét code chỉ còn là <b>đường cứu hộ</b> khi <span class="mono">&gt; 4</span> field, tức chỉ khi model tự sinh
+    <span class="mono">|</span> thô. Kiểm 8/8 edge case; gold thật vẫn 23.995 quad / 0 mismatch.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#31 — Escape không song ánh <span class="badge p2">P2</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">esc_term</span> / <span class="mono">unesc_term</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Term chứa <b>đúng chuỗi escape</b> <span class="mono">&amp;#124;</span> bị
+    <span class="mono">unesc_term</span> đọc thành <span class="mono">|</span> — mất nội dung gốc, không dấu hiệu gì.
+    Lỗi escaping kinh điển: không escape chính ký tự escape.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Thêm <span class="mono">("&amp;", "&amp;amp;")</span> vào <b>đầu</b> bảng escape và
+    unescape theo thứ tự <b>ngược</b> — <span class="mono">&amp;</span> escape đầu tiên, unescape cuối cùng.
+    Test <span class="mono">test_escape_is_injective_on_sentinel_text</span> khoá 5 chuỗi sentinel.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#32 — <span class="mono">find_ckpt</span> lấy checkpoint CŨ trong <span class="mono">/kaggle/input</span> <span class="badge p1">P1</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">kaggle_pipeline.find_ckpt</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Bản sửa #9 đọc <span class="mono">final_ckpt</span> từ
+    <span class="mono">selftrain_history.json</span> rồi khớp theo <b>basename</b>, iterate <span class="mono">sorted(dirs)</span>.
+    Trên Kaggle rất thường có dataset CŨ trong <span class="mono">/kaggle/input</span> và output MỚI trong
+    <span class="mono">/kaggle/working</span> mang <b>đúng cùng tên</b> — và <span class="mono">/input</span> đứng trước
+    <span class="mono">/working</span> theo thứ tự chữ. <b>Đã reproduce</b>: dựng hai thư mục
+    <span class="mono">selftrain_round2</span>, history trỏ tới bản <span class="mono">/working</span>, hàm chọn bản
+    <span class="mono">/input</span>. Tức là tôi tái tạo đúng loại lỗi mà #9 và #20 nói tới.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Khớp <b>đường dẫn đầy đủ</b> trước; nếu chỉ khớp basename thì ưu tiên
+    <span class="mono">/working</span> rồi <span class="mono">mtime</span> mới nhất, và <b>in ra tất cả</b> ứng viên.
+    Đường xếp hạng fallback cũng thêm khoá <span class="mono">/working</span>. Hai test khoá cả hai đường.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#33 — E4 ghi 5 bản quad thay vì dùng lại 1 file <span class="badge p2">P2</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">eval_injection.main</span> (nhánh shuffle)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Khi thêm <span class="mono">--out-dir</span> cho #2, tôi đổi tên file thành
+    <span class="mono">quads_inj_shuffle_r{i}.jsonl.gz</span> — mỗi lần lặp một file. Với corpus mỗi bản là hàng trăm MB
+    × <span class="mono">--repeats 5</span>, trong khi <span class="mono">/kaggle/working</span> chỉ ~20 GB.
+    Bản gốc dùng lại một file là <b>đúng</b>; chỉ report JSON cần tách theo lần lặp.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Quay về một tên file dùng lại; test
+    <span class="mono">test_injection_reuses_one_shuffle_file</span> khoá lại.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#34 — Cache ảnh 1 phần tử tương tác xấu với reservoir sampling <span class="badge p3">P3</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_c.apply_verifier.embed</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Sửa #34-gốc (cache không chặn trên) tôi thu về <b>1 phần tử</b>, lập luận
+    &ldquo;quad của cùng review nằm liền nhau&rdquo;. Nhưng bản sửa #16 thêm reservoir sampling <b>có shuffle</b> cho
+    <span class="mono">--limit</span>, nên hai unit POS/NEG của cùng review bị tách ra → ảnh bị embed lại lần thứ hai.
+    Hai thay đổi đúng riêng lẻ, sai khi đứng cạnh nhau.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>LRU <span class="mono">OrderedDict</span> 256 phần tử (~0,5 MB) — vẫn có chặn
+    trên, không còn thrash. Test khoá <span class="mono">CACHE_MAX</span> + <span class="mono">popitem(last=False)</span>.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#35 — Smoke test chưa từng kiểm kênh ν <span class="badge p1">P1</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">smoke_test.main</span> (bước 4)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Không phải lỗi của vòng 1 — lỗ hổng có từ trước, chỉ lộ ra khi tôi
+    <b>chạy</b> smoke test lần đầu. Quad tổng hợp hardcode <span class="mono">"sentiment": "negative"</span> cho tất cả,
+    nên ν = P(negative | nhắc aspect) ≡ 1,0 và <span class="mono">ν: adj t=0.0 q=1.0</span> ở <b>cả 5 aspect</b>.
+    Nghĩa là kênh ν — thứ spec gọi là &ldquo;estimand trung tâm của paper&rdquo; — <b>không có gate nào</b>;
+    smoke chỉ xác nhận <i>code chạy</i>, không xác nhận <i>code còn đo đúng</i>. Mọi <span class="mono">t=0,0</span>
+    vẫn PASS.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Trộn cực tính (base ν=0,35) và <b>tiêm trend đã biết</b> vào
+    <span class="mono">AM_FOOD</span> (+0,012/kỳ). Thêm 3 assert: ν của AM_FOOD phải có <span class="mono">t &gt; 3</span>
+    <b>và</b> vượt FDR; mọi aspect phẳng phải im lặng. Nâng <span class="mono">--n-perm</span> 100→300 vì với 100 lần xáo
+    thì q sàn rơi đúng cạnh 0,05 và assert sẽ lật theo seed. Kết quả chạy thật:
+    <span class="mono">ν bắt trend AM_FOOD t=+11,0 q=0,0166 · 3 aspect phẳng im lặng</span>.</div></div>
+</div>
+
+<div class="item warn">
+  <div class="hd">Lỗi cũ chưa sửa ở vòng 1, đã sửa ở vòng 2: probe crash trên Windows</div>
+  <p>
+    <span class="mono">scripts/probe_complaint_composition.py</span> dùng <span class="mono">open(QUADS)</span> /
+    <span class="mono">open(POOL)</span> không có <span class="mono">encoding='utf-8'</span> → locale cp1252 của Windows
+    cho <span class="mono">UnicodeDecodeError: 'charmap' codec can't decode byte 0x81</span> ngay dòng đầu.
+    Vòng 1 tôi <b>sửa file này mà không thử chạy nó</b> — bài học: sửa xong phải chạy, không chỉ đọc diff.
+    Nay <span class="mono">build_lexicon</span> OK: 13 code / 470 term.
+  </p>
 </div>
 
 <h2>Phần C — Đừng đụng vào</h2>

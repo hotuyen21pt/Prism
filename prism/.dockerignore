@@ -1,0 +1,12 @@
+# Không đưa dữ liệu / model / output vào image — chúng được mount lúc chạy.
+data/
+outputs/
+models/
+docs/
+kaggle_notebooks/
+**/__pycache__/
+*.pyc
+.git/
+.venv/
+# tests/ và scripts/ CÓ vào image: image sinh ra kết quả phải chạy được
+# `python -m unittest discover tests` và `python -m prism.smoke_test`.

@@ -28,11 +28,36 @@ log = U.get_logger("prism.download")
 
 UA = "Mozilla/5.0 (research; PRISM pipeline; contact: see repo)"
 
+# Magic bytes cua cac dinh dang anh ma PIL/CLIP doc duoc (viet dang hex de
+# khong le thuoc escape sequence trong source).
+_MAGIC = (
+    bytes.fromhex("ffd8ff"),            # JPEG
+    bytes.fromhex("89504e470d0a1a0a"),  # PNG
+    b"GIF87a", b"GIF89a",               # GIF
+    b"BM",                              # BMP
+)
+
+
+def is_image_bytes(b: bytes) -> bool:
+    if len(b) < 12:
+        return False
+    if b.startswith(_MAGIC):
+        return True
+    return b[:4] == b"RIFF" and b[8:12] == b"WEBP"   # WebP
+
+
+def is_image_file(path) -> bool:
+    try:
+        with open(path, "rb") as f:
+            return is_image_bytes(f.read(16))
+    except OSError:
+        return False
+
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cohort", default="T-unbiased",
-                    choices=["A-dense", "B-anchor", "T-unbiased", "corpus"])
+                    choices=C.COHORTS)
     ap.add_argument("--limit", type=int, default=0, help="0 = không giới hạn")
     ap.add_argument("--sleep", type=float, default=0.4,
                     help="giây nghỉ giữa 2 request (lịch sự với CDN)")
@@ -48,7 +73,7 @@ def main() -> None:
     keep = set(cohorts.get(args.cohort) or [])
 
     index: dict[str, str] = {}
-    n_new = n_skip = n_err = 0
+    n_new = n_skip = n_err = n_bad = 0
     for r in U.read_jsonl(C.STORE_DIR / "reviews.jsonl.gz"):
         if not r["has_photo"] or r["in_gold"]:
             continue
@@ -57,10 +82,15 @@ def main() -> None:
         if not r.get("photo_urls"):
             continue
         dest = img_dir / f"{r['review_uid']}.jpg"
-        if dest.exists() and dest.stat().st_size > 0:
+        if dest.exists() and is_image_file(dest):
             index[r["review_uid"]] = str(dest)
             n_skip += 1
             continue
+        if dest.exists():
+            # file cũ tồn tại nhưng KHÔNG phải ảnh (trang lỗi HTML lưu thành .jpg
+            # bởi bản cũ) -> xoá để tải lại, đừng tính là "đã có"
+            n_bad += 1
+            dest.unlink()
         if args.limit and n_new >= args.limit:
             continue
         url = r["photo_urls"][0]
@@ -70,7 +100,21 @@ def main() -> None:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=args.timeout) as resp:
-                dest.write_bytes(resp.read())
+                ctype = (resp.headers.get("Content-Type") or "").lower()
+                body = resp.read()
+            # CDN trả trang lỗi với status 200 rất thường (URL ảnh Booking hết hạn).
+            # Không kiểm thì file HTML mang tên .jpg, lần chạy sau được tính là
+            # "đã có" và đưa vào index; tới apply_verifier thì Image.open ném
+            # exception, bị except ăn im lặng -> quad mất v_image mà không ai biết.
+            if not ctype.startswith("image/") or not is_image_bytes(body):
+                n_err += 1
+                if n_err <= 20:
+                    log.warning("bỏ %s: không phải ảnh (Content-Type=%r, %d byte)",
+                                url[:80], ctype, len(body))
+                continue
+            tmp = dest.with_suffix(".part")     # ghi tạm rồi rename: không để lại
+            tmp.write_bytes(body)               # file ghi nửa vời khi bị ngắt
+            tmp.replace(dest)
             index[r["review_uid"]] = str(dest)
             n_new += 1
             if n_new % 200 == 0:
@@ -84,8 +128,8 @@ def main() -> None:
                 log.warning("lỗi %s: %s", url[:80], e)
 
     U.write_json(index_path, index)
-    log.info("xong: %d mới · %d đã có · %d lỗi -> %s (%d entry)",
-             n_new, n_skip, n_err, index_path, len(index))
+    log.info("xong: %d mới · %d đã có · %d lỗi · %d file hỏng đã xoá để tải lại "
+             "-> %s (%d entry)", n_new, n_skip, n_err, n_bad, index_path, len(index))
 
 
 if __name__ == "__main__":

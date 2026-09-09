@@ -49,6 +49,9 @@ class TestValenceInjection(unittest.TestCase):
 
 class TestShuffleInjection(unittest.TestCase):
     def test_preserves_period_multiset_and_content(self):
+        # make_quads cho mỗi quad một review_uid riêng, nên multiset period ở mức
+        # quad = mức review. Bất biến ĐÚNG của inject_shuffle là ở MỨC REVIEW —
+        # xem tests/test_regressions.py::TestShuffleIsReviewLevel.
         quads = make_quads()
         inj = inject_shuffle(quads, random.Random(2))
         self.assertEqual(collections.Counter(q["period"] for q in quads),

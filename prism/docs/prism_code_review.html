@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>PRISM — Review code toàn pipeline</title>
+<style>
+  @page { size: A4; margin: 14mm 12mm; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Segoe UI","Inter",system-ui,Arial,sans-serif; font-size: 10.3px; line-height: 1.5; color: #1f2430; margin: 0; }
+  h1 { font-size: 20px; margin: 0 0 2px; color: #0f172a; }
+  h2 { font-size: 14px; margin: 18px 0 6px; padding: 5px 9px; background: #0f172a; color: #fff; border-radius: 4px; }
+  h3 { font-size: 11.6px; margin: 12px 0 3px; color: #0f172a; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 2px; }
+  p { margin: 3px 0; }
+  .sub { color: #64748b; font-size: 9.6px; margin-bottom: 10px; }
+  .lead { background: #f1f5f9; border-left: 3px solid #0f172a; padding: 7px 10px; border-radius: 3px; margin: 8px 0 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 9.6px; }
+  th, td { border: 1px solid #d7dee8; padding: 3px 6px; text-align: left; vertical-align: top; }
+  th { background: #eef2f7; font-weight: 600; }
+  code, .mono { font-family: "Cascadia Code","Consolas",monospace; font-size: 9.2px; background: #f4f6f9; padding: 0 3px; border-radius: 3px; color: #b21e35; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 8px 10px; border-radius: 4px; font-family: "Cascadia Code","Consolas",monospace; font-size: 8.8px; line-height: 1.45; white-space: pre-wrap; margin: 5px 0; }
+  .item { margin: 9px 0; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 5px; break-inside: avoid; }
+  .item .hd { font-weight: 700; font-size: 11.2px; color: #0f172a; }
+  .badge { display: inline-block; font-size: 8.4px; font-weight: 700; padding: 1px 6px; border-radius: 10px; vertical-align: middle; margin-left: 4px; }
+  .p1 { background: #fee2e2; color: #b91c1c; }
+  .p2 { background: #fef3c7; color: #b45309; }
+  .p3 { background: #e0f2fe; color: #0369a1; }
+  .done { background: #dcfce7; color: #15803d; }
+  .todo { background: #fde68a; color: #92400e; }
+  .row { display: grid; grid-template-columns: 62px 1fr; gap: 4px 8px; margin-top: 4px; }
+  .k { color: #64748b; font-weight: 600; font-size: 9px; text-transform: uppercase; letter-spacing: .3px; padding-top: 1px; }
+  .keep { border-left: 3px solid #15803d; background: #f0fdf4; }
+  .warn { border-left: 3px solid #b45309; background: #fffbeb; }
+  ul { margin: 3px 0; padding-left: 18px; } li { margin: 2px 0; }
+  .foot { margin-top: 16px; padding-top: 8px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 9px; }
+</style>
+</head>
+<body>
+
+<h1>PRISM — Review code toàn pipeline</h1>
+<p class="sub">Review nội bộ + <b>đã áp dụng sửa</b> · commit gốc <span class="mono">7f5bc5d</span> (2026-09-08) · phạm vi: <span class="mono">prism/src/prism/*</span> · <span class="mono">prism/scripts/*</span> · <span class="mono">prism/tests/*</span> · Docker + repo hygiene · 28 hạng mục</p>
+
+<p class="lead">
+Khung pipeline <b>đúng và chắc</b>: tách 4 module rõ ràng, provenance posterior dùng
+<span class="mono">P_model</span> thật qua teacher forcing (không one-hot), shrinkage thay cho loại-ô-nhỏ ở cả hai
+kênh π/ν, permutation null riêng từng chuỗi + BH-FDR. Không hạng mục nào đòi viết lại.<br><br>
+<b>TRẠNG THÁI: đã sửa toàn bộ 24 hạng mục của bản review đầu, cộng 4 hạng mục phát hiện
+thêm trong lúc sửa (#25–#28).</b> Test: <b>61/61 PASS</b> — 37 test cũ giữ nguyên xanh, cộng 24 test
+hồi quy mới trong <span class="mono">tests/test_regressions.py</span> (trước đây <i>không test nào</i> bắt được #4, #6, #8, #9).
+Verify trên dữ liệu thật: Module A chạy lại cho cohort <b>khớp tuyệt đối</b> 270/1.207/514/10.629;
+Module B-data round-trip 23.995 quad, 0 mismatch; Module D end-to-end khôi phục đúng trend đã
+tiêm (ν-adj t=+11,19 q=0,007 cho aspect có drift · t=0,56 q=0,602 cho aspect phẳng).<br><br>
+Hai hạng mục <b>chưa đóng được bằng code</b> vì thiếu dữ liệu — xem <i>Còn treo</i>: D-a hiệu chỉnh
+recall (cần tập audit D0) và khoá blocklist theo ngày (cần <span class="mono">reviews_with_dates.jsonl</span> trong repo
+<span class="mono">hamos-mabsa</span>). Cả hai giờ báo lỗi tường minh thay vì im lặng.
+</p>
+
+<h2>Tóm tắt hạng mục &amp; trạng thái</h2>
+<table>
+  <tr><th>#</th><th>Việc</th><th>Repo/Vùng</th><th>Ưu tiên</th><th>Trạng thái</th></tr>
+  <tr><td>#1</td><td><span class="mono">.gitignore</span> không chặn 2 file zip 1,15 GB đang untracked</td><td>repo root</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#2</td><td><span class="mono">smoke_test</span> ghi đè file kết quả drift thật</td><td>src/prism</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#3</td><td>go/no-go Module C không được code cưỡng chế — bridge NO-GO vẫn dùng</td><td>module_c</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#4</td><td>Vector đặc trưng bridge viết 2 lần ở 2 hàm (lệch thứ tự = w rác)</td><td>module_c</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#5</td><td><span class="mono">p_perm</span> test changepoint nhưng báo cáo là trend (OLS)</td><td>module_d</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#6</td><td><span class="mono">inject_shuffle</span> xáo period theo QUAD, không theo review</td><td>eval_injection</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#7</td><td>Log D-a nói “áp dụng recall_table” trong khi chỉ đọc rồi bỏ</td><td>module_d</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#8</td><td>Ký tự <span class="mono">|</span> / <span class="mono">&lt;quad&gt;</span> trong term làm mất trắng quad khi parse</td><td>module_b_data</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#9</td><td><span class="mono">find_ckpt</span> chọn <span class="mono">selftrain_round1</span> thay vì <span class="mono">round2</span></td><td>kaggle_pipeline</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#10</td><td>Orchestrator vá source lúc chạy bằng so khớp chuỗi</td><td>kaggle_pipeline</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#11</td><td><span class="mono">--min-stratum</span>/<span class="mono">--min-valence-w</span>: help &amp; config nói “loại ô”, code “shrink”</td><td>module_d + config</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#12</td><td><span class="mono">fit_bridge</span> nhị phân hoá <span class="mono">v_image</span> ở 0,5 → mất tín hiệu / crash 1 lớp</td><td>module_c</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#13</td><td><span class="mono">q["score"] or 8.7</span> biến điểm 0,0 thật thành 8,7</td><td>module_c</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#14</td><td>Tiêu chí dừng self-train không so với teacher gốc</td><td>module_b_selftrain</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#15</td><td>Pseudo-label bỏ hẳn unit rỗng → student học over-generate</td><td>module_b_selftrain</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#16</td><td><span class="mono">--limit</span> lấy N unit ĐẦU FILE, mọi vòng self-train dùng cùng slice</td><td>module_b_infer</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#17</td><td><span class="mono">by_language</span>: bucket “other” luôn rỗng, review khác en/vi bị bỏ đếm</td><td>module_b_eval</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#18</td><td>Probe nhân bản WEST/CODES và đã lệch khỏi <span class="mono">config</span></td><td>scripts/probe</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#19</td><td><span class="mono">COHORT_DEFS</span> là code chết; ngưỡng cohort hardcode trong Module A</td><td>config</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#20</td><td><span class="mono">find_one</span>/<span class="mono">clone_repo</span> chọn file &amp; repo tuỳ ý theo glob</td><td>kaggle_pipeline</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#21</td><td>Docker không pin version; tên file <span class="mono">vimg</span> lệch giữa README và orchestrator</td><td>Docker + README</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#22</td><td>Ảnh tải về không kiểm tra nội dung → JPEG hỏng đếm là “đã có”</td><td>download_pool_photos</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#23</td><td><span class="mono">load_quads</span> tra <span class="mono">CODE2CAT</span> trước khi bỏ quad <span class="mono">w&lt;=0</span> → KeyError</td><td>module_d</td><td><span class="badge p3">P3</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#24</td><td>Dọn nhỏ: chrono split, magic number, hàm trùng, assert số cứng</td><td>toàn repo</td><td><span class="badge p3">P3</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td colspan="5" style="background:#fff7ed;font-weight:700">Phát hiện THÊM trong lúc sửa (chi tiết ở Phần B2)</td></tr>
+  <tr><td>#25</td><td>Khoá blocklist <span class="mono">(hotel,date)</span> vô hiệu — leak flag 18.475 &rarr; 1.466</td><td>module_a_store</td><td><span class="badge p1">P1</span></td><td><span class="badge todo">Cần dữ liệu</span></td></tr>
+  <tr><td>#26</td><td>Probe E1c chưa từng chạy được: 0/10.711 segment có <span class="mono">review_date</span></td><td>module_b_data</td><td><span class="badge p1">P1</span></td><td><span class="badge todo">Cần dữ liệu</span></td></tr>
+  <tr><td>#27</td><td>Sentinel coi file <b>rỗng</b> là output hợp lệ &rarr; <span class="mono">all</span> bỏ qua infer</td><td>kaggle_pipeline</td><td><span class="badge p1">P1</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+  <tr><td>#28</td><td>Rescore bị truncate &rarr; <span class="mono">p_model</span> uniform &rarr; posterior = prior thuần</td><td>module_b_infer</td><td><span class="badge p2">P2</span></td><td><span class="badge done">Đã sửa</span></td></tr>
+</table>
+
+<h2>Phần A — Đường găng ra số của paper</h2>
+<p class="sub">Những chỗ pipeline vẫn chạy xanh nhưng con số cuối cùng sai hoặc không đúng như mô tả.</p>
+
+<h3><span class="mono">src/prism/smoke_test.py</span></h3>
+<div class="item">
+  <div class="hd">#2 — Smoke test ghi đè file kết quả drift thật <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">main</span> (bước 4 và bước 5)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Bước 4 gọi <span class="mono">module_d_drift</span> <b>không truyền <span class="mono">--out</span></b>, nên nó ghi đúng đường dẫn mặc định
+    <span class="mono">outputs/drift/drift_results.corpus.taxonomy_code.json</span> — chính là file kết quả chính thức của cohort corpus.
+    Bước 5 lại ghi tiếp <span class="mono">injection_shuffle.json</span> + <span class="mono">drift_results.inj_shuffle_r*.json</span>.
+    Kịch bản: chạy corpus thật xong (nhiều giờ), rồi chạy <span class="mono">python -m prism.smoke_test</span> để kiểm tra sau khi sửa code →
+    file kết quả bị thay bằng 50k pseudo-quad keyword tổng hợp, <b>cùng tên, cùng schema, không cảnh báo</b>.
+    Không có backup vì <span class="mono">outputs/</span> nằm trong <span class="mono">.gitignore</span>.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Truyền <span class="mono">--out</span> trỏ vào <span class="mono">outputs/drift/smoke/drift_results.smoke.json</span>, và set
+    <span class="mono">PRISM_WORK_DIR</span> tạm (hoặc thêm <span class="mono">--out-dir</span> cho <span class="mono">eval_injection</span>) để mọi sản phẩm smoke nằm trong thư mục riêng.</div></div>
+</div>
+
+<h3><span class="mono">src/prism/module_c_reliability.py</span></h3>
+<div class="item">
+  <div class="hd">#3 — Ngưỡng go/no-go được tính rồi bỏ, không chặn gì <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">fit_bridge</span> → <span class="mono">apply_weights</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">fit_bridge</span> tính Spearman với human audit, ghi <span class="mono">go_nogo: "NO-GO"</span> vào
+    <span class="mono">bridge_report.json</span> — rồi <b>vẫn pickle <span class="mono">bridge.pkl</span> ra đĩa</b>. <span class="mono">apply_weights</span> quyết định
+    dùng bridge chỉ bằng <span class="mono">if bp.exists()</span>. Hệ quả: ρ = 0,05 (dưới ngưỡng 0,30) vẫn cho ra
+    <span class="mono">w = r̂(bridge)</span> cho toàn corpus, và hợp đồng ghi trong README (“NO-GO → fallback <span class="mono">conf_seq</span>”)
+    <b>không bao giờ chạy</b>. Tệ hơn: nếu <span class="mono">len(pairs) &lt; 30</span> (audit chưa gán đủ, hoặc khoá không khớp — xem Phần C)
+    thì khối tính Spearman bị bỏ qua im lặng, <span class="mono">go_nogo</span> không có trong report, và bridge vẫn được dùng.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Ghi verdict vào <b>trong</b> pickle; <span class="mono">apply_weights</span> đọc verdict và fallback <span class="mono">conf_seq</span> nếu ≠ GO.
+    Khi NO-GO hoặc thiếu audit thì đặt tên file <span class="mono">bridge_NOGO.pkl</span> để không có đường dùng nhầm.
+    Tương tự cho <span class="mono">verifier.pkl</span>: <span class="mono">verifier_report.json</span> có ΔAUC nhưng <span class="mono">apply_verifier</span> không kiểm tra.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#4 — Vector đặc trưng bridge được viết tay 2 lần <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">fit_bridge.feat</span> (hàm nội bộ) vs list literal trong <span class="mono">apply_weights.rows</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Hai nơi dựng cùng vector 5 chiều <span class="mono">[conf_seq, p_posterior, phi_pos, log1p(n_words), prov_flip]</span>
+    bằng hai đoạn code độc lập. Hiện tại thứ tự trùng nhau nên đúng. Thêm 1 đặc trưng (ví dụ <span class="mono">has_photo</span>) vào
+    <span class="mono">feat</span> mà quên sửa <span class="mono">apply_weights</span> → sklearn nhận đủ 5 cột, <b>không raise</b>, chỉ dịch sai cột:
+    <span class="mono">r̂</span> rác → <span class="mono">w</span> rác → mọi số π/ν, mọi FDR, mọi verdict trong paper sai mà pipeline chạy xanh hoàn toàn.
+    Đây là loại lỗi không test nào hiện có bắt được.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Nâng <span class="mono">feat</span> thành hàm module-level <span class="mono">bridge_features(q) -&gt; list[float]</span> đặt cạnh
+    <span class="mono">BRIDGE_FEATURE_NAMES</span>, gọi từ cả hai chỗ; thêm assert <span class="mono">len(x) == len(BRIDGE_FEATURE_NAMES)</span>
+    và so <span class="mono">bridge.n_features_in_</span> khi load pickle.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#12 — Nhị phân hoá <span class="mono">v_image</span> ở 0,5 làm mất tín hiệu và có thể crash <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">fit_bridge</span> (dòng dựng <span class="mono">yb</span>)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">v_image</span> là xác suất liên tục do <span class="mono">head.predict_proba</span> sinh ra, bị ép về 0/1 tại 0,5.
+    (a) Mất toàn bộ độ tin cậy — quad <span class="mono">v_image=0,51</span> và <span class="mono">0,99</span> thành cùng một nhãn.
+    (b) Head được fit trên tập cân bằng 1:1 nhưng pool <b>không</b> cân bằng; nếu mọi <span class="mono">v_image</span> rơi cùng một phía 0,5
+    thì <span class="mono">LogisticRegression.fit</span> raise <span class="mono">"needs samples of at least 2 classes"</span> và stage bridge chết
+    sau khi đã embed xong toàn bộ ảnh. Cùng rủi ro với model propensity nếu <span class="mono">has_photo</span> đồng nhất trong file đầu vào.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Fit trực tiếp trên nhãn mềm (hồi quy logistic có <span class="mono">sample_weight</span> nhân đôi hàng theo <span class="mono">v_image</span>,
+    hoặc beta-regression), tối thiểu là guard <span class="mono">len(set(yb)) &lt; 2</span> với thông báo nói rõ phân phối <span class="mono">v_image</span> quan sát được.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#13 — <span class="mono">q["score"] or 8.7</span> biến điểm 0,0 thật thành 8,7 <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">fit_bridge</span> (đặc trưng propensity <span class="mono">Xp</span> và <span class="mono">w_ipw</span>)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">U.parse_score("Đạt điểm 0,0")</span> trả đúng <span class="mono">0.0</span> (đã kiểm chứng), và <span class="mono">0.0 or 8.7 == 8.7</span> trong Python.
+    Nên review bị chấm 0 điểm — <b>đúng cái đuôi quan trọng nhất cho drift phàn nàn</b> — được gán điểm 8,7 (mean của review có ảnh)
+    trong cả model propensity lẫn khi áp IPW. Kết quả: trọng số IPW của nhóm điểm thấp bị lệch có hệ thống, không có cảnh báo.</div></div>
+  <div class="row"><div class="k">Sửa</div><div><span class="mono">q["score"] if q["score"] is not None else 8.7</span>, tách hằng số ra <span class="mono">config</span> (đang hardcode 2 lần trong cùng hàm).</div></div>
+</div>
+<div class="item">
+  <div class="hd">#12b — <span class="mono">w = conf_seq đã temperature-scale</span> chỉ có trong docstring <span class="badge p3">P3</span></div>
+  <div class="row"><div class="k">Vị trí</div><div>docstring module <span class="mono">module_c_reliability</span> vs <span class="mono">apply_weights</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Header module và README §4 nói fallback NO-GO là “<span class="mono">conf_seq</span> đã temperature-scale”;
+    <span class="mono">apply_weights</span> dùng <span class="mono">r_hat = q["conf_seq"]</span> thô, không có bước hiệu chỉnh nhiệt độ nào trong repo.
+    Người đọc paper sẽ tưởng nhánh fallback đã được calibrate.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Hoặc implement (fit 1 tham số T trên dev), hoặc sửa docstring + README thành “<span class="mono">conf_seq</span> thô, chưa calibrate”.</div></div>
+</div>
+
+<h3><span class="mono">src/prism/module_d_drift.py</span></h3>
+<div class="item">
+  <div class="hd">#5 — <span class="mono">p_perm</span> kiểm định changepoint, nhưng được báo cáo cùng slope OLS như một kết luận trend <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">channel_stats</span> → <span class="mono">permutation_p</span> → khối verdict trong <span class="mono">run</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">channel_stats</span> tính hai thống kê khác nhau: <span class="mono">slope_per_year</span>/<span class="mono">t_stat</span> từ
+    <span class="mono">ols_trend</span>, và <span class="mono">welch_t</span> từ <span class="mono">best_split</span>. <span class="mono">permutation_p</span> chỉ nhận
+    <span class="mono">obs_t = ct</span> (Welch của changepoint) — nên <span class="mono">p_perm</span>, và do đó <span class="mono">p_fdr</span> +
+    <span class="mono">significant_after_fdr</span> + <span class="mono">n_significant_after_fdr</span>, <b>hoàn toàn là kiểm định bước nhảy</b>.
+    Nhưng verdict lại gate trên dấu slope OLS (<span class="mono">sa * sr &gt; 0</span>). Hai hệ quả cụ thể:
+    một aspect trôi đơn điệu mạnh (OLS t = 8) nhưng không có bước nhảy rõ → <span class="mono">p_perm</span> cao → verdict “phẳng”;
+    ngược lại một bước nhảy sạch với slope ≈ 0 → “XU HƯỚNG THẬT”. Con số headline
+    “<i>k/14 aspect vượt FDR</i>” là số aspect có changepoint, đang được gọi là số aspect có xu hướng.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Chạy permutation cho <b>cả hai</b> thống kê (cùng vòng lặp, thêm <span class="mono">ols_trend(deseason(sh))</span> vào
+    <span class="mono">permutation_p</span>), trả <span class="mono">p_perm_trend</span> và <span class="mono">p_perm_cp</span> riêng, đưa vào 2 lưới FDR riêng;
+    verdict gate trên <span class="mono">p_perm_trend</span>. Nếu quyết định giữ nguyên thì phải đổi tên trường thành
+    <span class="mono">p_perm_changepoint</span> và sửa README + caption bảng trong paper.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#7 — Log nói “áp dụng recall_table.json”, code chỉ đọc rồi bỏ <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">run</span> (khối D-a)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">rec = json.loads(rec_path.read_text())</span> gán vào biến rồi <b>không dùng ở đâu nữa</b>
+    (đã grep toàn repo: <span class="mono">rec</span> không xuất hiện lần thứ hai). Log in ra
+    <span class="mono">"D-a: áp dụng recall_table.json"</span>. README §5 <b>có</b> ghi rõ đây là stub — nên vấn đề nằm ở log:
+    khi tập audit D0 về và ai đó đặt file recall vào <span class="mono">outputs/drift/</span>, log sẽ báo đã áp dụng,
+    số ra không có hiệu chỉnh recall, và không cách nào phát hiện từ output.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Đổi log thành <span class="mono">"D-a: THẤY recall_table.json nhưng CHƯA áp dụng (stub) — số chưa hiệu chỉnh recall"</span>
+    ở mức <span class="mono">WARNING</span>, ghi cờ <span class="mono">"recall_adjusted": false</span> vào JSON output, và
+    <span class="mono">raise SystemExit</span> nếu chạy với <span class="mono">--final</span>.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#11 — <span class="mono">--min-stratum</span> / <span class="mono">--min-valence-w</span>: help và config nói “loại ô”, code “shrink” <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">main</span> (help của argparse), <span class="mono">config.MIN_STRATUM_N</span> / <span class="mono">config.MIN_VALENCE_CELL_W</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Code đã đổi sang shrinkage (đúng, và có test pin lại — xem Phần C), nhưng comment trong
+    <span class="mono">config.py</span> vẫn viết “ô dưới ngưỡng này bị bỏ qua trong kỳ đó” và help của
+    <span class="mono">--min-valence-w</span> vẫn viết “ô … dưới tổng trọng số này bị bỏ ở kênh ν”.
+    Hệ quả cụ thể: ai đó muốn siết lọc sẽ đặt <span class="mono">--min-stratum 200</span> và nhận điều ngược lại —
+    prior mạnh gấp 7 lần, mọi share bị kéo về share gộp của kỳ, <b>mọi trend bị làm phẳng</b>,
+    và họ sẽ đọc kết quả đó như “không có drift”. README §5 mô tả đúng; chỉ config + help sai.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Đổi 2 comment trong config và 1 help thành “cường độ prior shrink về share/tỷ lệ gộp của kỳ (đơn vị: tổng w)”.
+    Cân nhắc đổi tên biến thành <span class="mono">STRATUM_PRIOR_W</span> / <span class="mono">VALENCE_PRIOR_W</span> để tên không còn gợi ý ngưỡng lọc.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#23 — <span class="mono">CODE2CAT</span> được tra trước khi quad <span class="mono">w&lt;=0</span> bị bỏ <span class="badge p3">P3</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">load_quads</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Thứ tự trong vòng lặp: tính <span class="mono">a</span> (có <span class="mono">C.CODE2CAT[q["taxonomy_code"]]</span>) <b>trước</b>
+    <span class="mono">if w &lt;= 0: continue</span>. <span class="mono">apply_weights</span> chủ ý đặt <span class="mono">w=0</span> cho code ngoài taxonomy,
+    nhưng Module D crash <span class="mono">KeyError</span> trước khi tới nhánh bỏ đó. Hiện an toàn <i>chỉ vì</i>
+    <span class="mono">parse_linearized</span> đã lọc code ở bước parse — bất kỳ file quad dựng tay (injection, probe, mock test) có code lạ
+    sẽ làm chết cả run ở một dòng bất kỳ giữa 1,9M dòng.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Chuyển <span class="mono">w</span> và <span class="mono">if w &lt;= 0: continue</span> lên trước, và dùng
+    <span class="mono">C.CODE2CAT.get(code)</span> + <span class="mono">continue</span> có đếm thống kê thay vì index trực tiếp.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#23b — “ĐẢO DẤU sau hiệu chỉnh” cũng nổ khi slope bằng 0 <span class="badge p3">P3</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">run</span> (khối verdict)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">sr = (...).get("slope_per_year") or 0.0</span> gộp “thiếu số” và “bằng 0” thành một; nhánh
+    <span class="mono">elif a_sig</span> cuối cùng nhận cả trường hợp <span class="mono">sa * sr == 0</span> và gán nhãn “ĐẢO DẤU”, vốn là một
+    kết luận rất mạnh trong paper. Cũng vậy: <span class="mono">ols_trend</span> chia cho <span class="mono">sxx</span> không guard — chuỗi 1 điểm
+    (đường bootstrap nếu <span class="mono">pi_periods</span> co lại) chia cho 0.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Dùng <span class="mono">is None</span> tường minh; thêm nhánh riêng <span class="mono">"không xác định"</span> khi một trong hai slope thiếu; guard <span class="mono">sxx == 0</span>.</div></div>
+</div>
+
+<h3><span class="mono">src/prism/eval_injection.py</span></h3>
+<div class="item">
+  <div class="hd">#6 — <span class="mono">inject_shuffle</span> xáo period theo QUAD, phá cấu trúc review <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">inject_shuffle</span> (dùng bởi E4, và bởi E3a để dựng nền null)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Hàm shuffle <b>list period</b> rồi <span class="mono">zip</span> lại theo từng quad. Hai quad của cùng một
+    <span class="mono">review_uid</span> vì thế nhận hai tháng khác nhau — dữ liệu null chứa những review không tồn tại, trải trên nhiều kỳ.
+    Hai hệ quả: (a) <span class="mono">load_quads</span> gom <span class="mono">rev_acc[(period,stratum)][review_uid]</span>, nên bootstrap resample
+    “review” trên các mảnh review bị xé, tức đơn vị resample nhỏ hơn thật; (b) với E4, xáo theo quad <b>phá tương quan trong review</b>,
+    làm null độc lập hơn dữ liệu thật → phương sai chuỗi bị hạ → <b>FPR thực nghiệm bị ước lượng thấp</b> và negative control PASS quá dễ.
+    Đúng chỗ này là điểm tựa cho toàn bộ lập luận “khung không sinh drift giả”, nên sai lệch ở đây là sai lệch của kết luận chính.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Xáo ở mức review: lấy <span class="mono">uids = sorted({q["review_uid"]})</span>, dựng
+    <span class="mono">period_of_uid</span>, permute <b>giá trị</b> của map đó, rồi broadcast xuống mọi quad của cùng uid.
+    Test <span class="mono">test_preserves_period_multiset_and_content</span> vẫn pass, cần thêm 1 test: mọi quad cùng uid có cùng period sau khi xáo.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#6b — <span class="mono">inject_valence</span> tự nhận “đổi đúng một thứ” nhưng đổi cả kênh π <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">inject_valence</span> + header module (E3c)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Header viết “<i>lật δ% quad pos→neg … KHÔNG đổi φ — injection chỉ đổi đúng một thứ</i>”.
+    Nhưng <span class="mono">load_quads</span> nhận quad vào kênh π theo điều kiện <span class="mono">phi == "NEG" or sentiment == "negative"</span>,
+    nên mọi quad bị lật cũng <b>đi vào tử số của π</b>. Cột <span class="mono">prevalence_detected_within_3</span> trong report E3c
+    vì thế bị nhiễu bởi thiết kế: nó không phải bằng chứng “π giữ im lặng khi chỉ có valence drift”, mà là hệ quả tất yếu của injection.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Nói rõ trong report (thêm trường <span class="mono">"note": "π cũng bị ảnh hưởng theo thiết kế"</span>), hoặc thêm
+    <span class="mono">--pi-uses-phi-only</span> cho Module D để E3c đo được kênh π độc lập với sentiment.</div></div>
+</div>
+
+<h3><span class="mono">src/prism/module_b_data.py</span> · <span class="mono">module_b_selftrain.py</span> · <span class="mono">module_b_infer.py</span> · <span class="mono">module_b_eval.py</span></h3>
+<div class="item">
+  <div class="hd">#8 — Ký tự <span class="mono">|</span> hoặc <span class="mono">&lt;quad&gt;</span> trong term làm mất trắng cả quad <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">linearize</span> ↔ <span class="mono">parse_linearized</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Đã kiểm chứng: <span class="mono">linearize([{aspect_term: "gia | chat luong", …}])</span> sinh
+    <span class="mono">&lt;quad&gt; gia | chat luong | FAC_ROOM | tot | positive &lt;/quad&gt;</span>, và
+    <span class="mono">parse_linearized</span> của chuỗi đó trả <span class="mono">[]</span> — 5 field ≠ 4 nên quad bị bỏ im lặng.
+    Tương tự nếu term chứa <span class="mono">&lt;/quad&gt;</span>. Hai đường thiệt hại: (a) lúc train, target vẫn chứa quad đó nên model
+    được dạy sinh ra format mà chính parser sẽ bỏ; (b) lúc infer, mọi quad model sinh có <span class="mono">|</span> trong opinion
+    (rất thường trong review đa ngữ: “giá | chất lượng”, “wifi|tv”) bị mất → recall lệch có hệ thống theo <i>loại term</i>,
+    không theo loại aspect, nên không xuất hiện trong bảng <span class="mono">by_category</span> nào.
+    <span class="mono">roundtrip_mismatch</span> có đếm và smoke test có assert <span class="mono">== 0</span> — hiện gold sạch nên bằng 0;
+    nhưng đó là bằng chứng cho gold hôm nay, không phải bảo vệ cho pool.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Escape trong <span class="mono">linearize</span> (thay <span class="mono">|</span> → <span class="mono">&amp;#124;</span> hoặc bỏ hẳn ký tự phân cách khỏi term)
+    và unescape/khôi phục trong <span class="mono">parse_linearized</span>; đồng thời <span class="mono">split("|", 3)</span> với
+    <span class="mono">maxsplit</span> để field cuối (sentiment) luôn parse được. Thêm test round-trip cho term có <span class="mono">|</span> và <span class="mono">&lt;/quad&gt;</span>.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#14 — Self-train không so dev F1 với teacher gốc <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_b_selftrain.main</span> (khối bước 4)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Điều kiện dừng là <span class="mono">len(history) &gt; 1 and f1 &lt; history[-2]["dev_f1"]</span>: vòng 1 <b>không có</b>
+    mốc nào để so, nên luôn được nhận và <span class="mono">ckpt = new_ckpt</span>. Nếu pseudo-label vòng 1 làm dev F1 tụt từ 0,62 xuống 0,55,
+    script vẫn báo thành công, ghi <span class="mono">final_ckpt = selftrain_round1</span>, và <span class="mono">infer</span> chính thức dùng model
+    <b>tệ hơn seed</b>. Không log nào nói ra vì seed chưa từng được eval trong cùng script.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Eval seed teacher <b>trước</b> vòng 1, đưa vào <span class="mono">history[0]</span> với <span class="mono">round: 0</span>,
+    và chỉ nhận <span class="mono">new_ckpt</span> khi <span class="mono">f1 &gt; max(dev_f1 đã thấy)</span>.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#15 — Pseudo-label bỏ hẳn unit không còn quad nào <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">pseudo_rows</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">by_unit</span> chỉ nhận quad vượt <span class="mono">tau</span>/<span class="mono">tau_post</span>, và <span class="mono">rows</span> được dựng từ
+    <span class="mono">by_unit.items()</span> — nên một (review, φ) mà model sinh 3 quad đều dưới ngưỡng <b>biến mất hoàn toàn</b> khỏi tập train,
+    thay vì trở thành ví dụ target rỗng. Student vì thế chỉ thấy input “luôn có quad để trích”, học over-generate:
+    precision trên gold test tụt trong khi recall tăng — đúng dấu hiệu error propagation mà guardrail <span class="mono">--max-skew</span>
+    không phát hiện được (nó chỉ xem phân phối cực tính, không xem tỷ lệ unit rỗng).</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Giữ unit rỗng với <span class="mono">target = ""</span> theo một tỷ lệ định trước (ví dụ bằng tỷ lệ segment rỗng trong gold),
+    và log <span class="mono">n_empty_units</span> vào <span class="mono">selftrain_history.json</span>.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#16 — <span class="mono">--limit</span> lấy N unit đầu file, mọi vòng self-train dùng cùng slice <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_b_infer.main</span> (vòng lặp <span class="mono">units()</span>) ← gọi từ <span class="mono">module_b_selftrain.main</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">units()</span> đọc <span class="mono">reviews.jsonl.gz</span> theo thứ tự ghi của Module A (theo thứ tự pool, tức gom theo hotel),
+    và <span class="mono">--limit</span> cắt N đơn vị <b>đầu tiên</b>. Hai hệ quả: (a) 200k đơn vị đó <b>không phải mẫu ngẫu nhiên</b> của cohort —
+    chúng thuộc một tập con hotel xuất hiện sớm trong pool, nên phân phối stratum/kỳ bị lệch, và pseudo-label thừa hưởng đúng cái lệch đó;
+    (b) vòng 2 của self-train gọi lại infer với cùng <span class="mono">--limit</span> nên <b>đọc lại đúng cùng 200k đơn vị</b> —
+    không có dữ liệu mới, chỉ có teacher mới, đúng công thức để tự khuếch đại lỗi của chính mình.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Thêm <span class="mono">--sample-seed</span> + reservoir sampling trên <span class="mono">units()</span> (đã có sẵn pattern Algorithm R trong
+    <span class="mono">make_audit_samples</span>), và cho self-train truyền seed khác nhau mỗi vòng (<span class="mono">C.RANDOM_SEED + rnd</span> — đã có biến này).</div></div>
+</div>
+<div class="item">
+  <div class="hd">#17 — <span class="mono">by_language</span>: bucket “other” luôn rỗng <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_b_eval.main</span> (dict <span class="mono">report["by_language"]</span>)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Bucket được duyệt trên 3 chuỗi literal <span class="mono">("en","vi","other")</span> và filter so
+    <span class="mono">langs.get(...) == lv</span>, trong khi <span class="mono">langs</span> chứa mã ngôn ngữ thật (<span class="mono">"ko"</span>,
+    <span class="mono">"zh"</span>, <span class="mono">"fr"</span>, <span class="mono">"?"</span>…). Không review nào có <span class="mono">languages[0] == "other"</span>,
+    nên cột “other” luôn <span class="mono">gold=0 pred=0 F1=0</span>, và <b>toàn bộ review không en/vi bị bỏ khỏi bảng</b> —
+    tức 3,3% gold (theo tỷ lệ 80,5 en / 16,2 vi trong docstring train) không được báo cáo, và F1 theo ngôn ngữ không cộng lại thành overall.</div></div>
+  <div class="row"><div class="k">Sửa</div><div><span class="mono">"other": agg(lambda g: langs.get(g["source_review_id"]) not in ("en","vi"))</span>, và thêm
+    <span class="mono">assert</span> mềm rằng <span class="mono">gold(en)+gold(vi)+gold(other) == gold(overall)</span>.</div></div>
+</div>
+
+<h2>Phần B — Orchestration, cấu hình, repo</h2>
+<p class="sub">Không ảnh hưởng công thức, nhưng đây là chỗ một run 6 tiếng GPU chết giữa đường hoặc chạy sai checkpoint.</p>
+
+<h3>repo root · <span class="mono">.gitignore</span></h3>
+<div class="item">
+  <div class="hd">#1 — Hai file zip 1,15 GB đang untracked và KHÔNG bị gitignore <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">prism/.gitignore</span> (repo không có <span class="mono">.gitignore</span> ở root)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">git status</span> đang liệt <span class="mono">?? hamos-mabsa.zip</span> (971 MB) và
+    <span class="mono">?? prism/data/raw.zip</span> (207 MB). <span class="mono">.gitignore</span> chỉ chặn <span class="mono">/data/raw/*.jsonl</span> — không chặn
+    <span class="mono">.zip</span>, và không chặn gì ở root vì file <span class="mono">.gitignore</span> nằm trong <span class="mono">prism/</span>.
+    Một lệnh <span class="mono">git add -A</span> (rất dễ xảy ra khi commit message toàn là “update”) sẽ đẩy 1,15 GB vào history —
+    không xoá được bằng <span class="mono">git rm</span>, phải rewrite history, và GitHub chặn file &gt;100 MB nên push sẽ fail
+    <i>sau khi</i> commit đã hình thành.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Thêm <span class="mono">.gitignore</span> ở root repo với <span class="mono">*.zip</span> +
+    <span class="mono">hamos-mabsa/</span>, và thêm <span class="mono">*.zip</span> vào <span class="mono">prism/.gitignore</span>. Làm việc này <b>trước</b> mọi commit khác.</div></div>
+</div>
+
+<h3><span class="mono">scripts/kaggle_pipeline.py</span></h3>
+<div class="item">
+  <div class="hd">#9 — <span class="mono">find_ckpt</span> chọn <span class="mono">selftrain_round1</span> thay vì <span class="mono">round2</span> <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">find_ckpt.rank</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Đã kiểm chứng: với hai thư mục <span class="mono">…/selftrain_round1</span> và <span class="mono">…/selftrain_round2</span>,
+    khoá rank là <span class="mono">(…, len(d))</span> — độ dài bằng nhau — nên <span class="mono">sorted(set(dirs))</span> quyết định theo thứ tự chữ và
+    <b><span class="mono">round1</span> thắng</b>. README ghi bất biến “<i>infer chính thức phải dùng checkpoint tốt nhất từ self-train</i>”;
+    orchestrator làm ngược lại, in ra <span class="mono">CKPT = …round1</span> giữa hàng trăm dòng log, rồi chạy 6+ tiếng infer trên corpus
+    bằng model của vòng trước.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Đọc <span class="mono">selftrain_history.json</span> (đã có <span class="mono">final_ckpt</span> + <span class="mono">dev_f1</span> từng vòng)
+    và ưu tiên <span class="mono">final_ckpt</span>; fallback: rank theo số vòng parse từ tên (<span class="mono">round(\d+)</span>) <b>giảm dần</b>,
+    rồi theo <span class="mono">mtime</span>. In dev F1 của checkpoint được chọn.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#10 — Orchestrator ghi đè source code lúc chạy bằng so khớp chuỗi <span class="badge p1">P1</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">patch_selftrain_batch</span> và <span class="mono">patch_infer_bug</span> (gọi từ <span class="mono">main</span> / <span class="mono">do_step</span>)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">patch_selftrain_batch</span> tìm một needle 2 dòng <b>kèm đúng 24 khoảng trắng thụt lề</b> trong
+    <span class="mono">module_b_selftrain.py</span> và <span class="mono">write_text</span> đè lại file để chèn <span class="mono">--batch</span>/<span class="mono">--score-batch</span>.
+    Needle hiện còn khớp (đã kiểm chứng). Reformat, đổi tên biến, hay chỉ cần <span class="mono">black</span> chạy qua file đó → needle không khớp →
+    <span class="mono">if needle in t</span> false → <b>không patch, không cảnh báo</b> → self-train gọi infer với default
+    <span class="mono">--batch 32 --score-batch 48</span> → OOM trên T4 sau khi đã train xong vòng 1, mất cả session GPU.
+    <span class="mono">patch_infer_bug</span> thì đã là no-op hoàn toàn: needle <span class="mono">s_post != q["sentiment_model"]</span>
+    không còn tồn tại trong <span class="mono">module_b_infer.py</span> (đã kiểm chứng: <span class="mono">False</span>) — nó chỉ còn là code chết
+    có quyền ghi vào source.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Thêm <span class="mono">--batch</span> và <span class="mono">--score-batch</span> làm argparse thật của
+    <span class="mono">module_b_selftrain</span>, forward xuống <span class="mono">subprocess.run</span>, rồi <b>xoá cả hai hàm patch</b>.
+    Không có lý do nào để orchestrator được quyền viết vào <span class="mono">src/</span>.</div></div>
+</div>
+<div class="item">
+  <div class="hd">#20 — <span class="mono">find_one</span> và <span class="mono">clone_repo</span> chọn file/repo tuỳ theo thứ tự glob <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">find_one</span> (<span class="mono">return hits[0]</span>) và <span class="mono">clone_repo</span> (vòng lặp <span class="mono">SEARCH_ROOTS</span>)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Trên Kaggle rất thường xuyên attach cùng lúc dataset store + output notebook bước trước, và <b>cả hai đều chứa</b>
+    <span class="mono">train.t2t.jsonl</span> / <span class="mono">dev.jsonl</span> / <span class="mono">hotel_cohorts.json</span>.
+    <span class="mono">glob(recursive=True)</span> không bảo đảm thứ tự, nên <span class="mono">hits[0]</span> có thể là bản cũ; step
+    <span class="mono">train</span> sẽ stage file cũ vào <span class="mono">work/extract/</span>, in <span class="mono">staged …</span> như bình thường, và train trên split sai.
+    Cùng vấn đề với <span class="mono">clone_repo</span>: nó <b>ưu tiên bất kỳ repo tìm thấy dưới <span class="mono">/kaggle/input</span></b>
+    trước khi clone, nên một output notebook cũ có thư mục <span class="mono">Prism</span> sẽ khiến cả run dùng code cũ —
+    trong khi cell setup ở README vừa <span class="mono">git clone --depth 1</span> bản mới về <span class="mono">/kaggle/working</span>.</div></div>
+  <div class="row"><div class="k">Sửa</div><div><span class="mono">find_one</span>: sắp theo (ưu tiên <span class="mono">/kaggle/working</span> trước <span class="mono">/kaggle/input</span>, rồi
+    <span class="mono">mtime</span> giảm dần), và <b>in ra tất cả</b> hit khi có &gt;1 để người chạy thấy mình đang lấy bản nào.
+    <span class="mono">clone_repo</span>: đảo thứ tự — thử clone trước, chỉ fallback sang repo có sẵn khi không có internet, và in commit hash đang dùng.</div></div>
+</div>
+
+<h3><span class="mono">src/prism/config.py</span></h3>
+<div class="item">
+  <div class="hd">#19 — <span class="mono">COHORT_DEFS</span> là code chết, ngưỡng cohort thật hardcode trong Module A <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">config.COHORT_DEFS</span> vs <span class="mono">module_a_store.build_store</span> (khối A8)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Đã grep toàn repo: <span class="mono">COHORT_DEFS</span> và <span class="mono">needs_gold</span> chỉ xuất hiện trong chính
+    <span class="mono">config.py</span>, không nơi nào đọc. Ngưỡng thật nằm trong <span class="mono">build_store</span> dưới dạng literal
+    <span class="mono">&gt;= 1000</span> / <span class="mono">&gt;= 300</span> / <span class="mono">sp == "test"</span>.
+    Docstring đầu file config viết “<i>Mọi hằng số/ngưỡng của pipeline nằm ở đây, không rải rác trong code</i>” —
+    câu đó sai đúng ở cái knob dễ bị tinh chỉnh nhất. Ai sửa <span class="mono">min_pool</span> trong <span class="mono">COHORT_DEFS</span>
+    sẽ thấy cohort size không đổi và đi tìm bug ở chỗ khác. Ngoài ra <span class="mono">"T-unbiased"</span> thiếu khoá
+    <span class="mono">needs_gold</span> mà 3 entry kia đều có → consumer đầu tiên viết <span class="mono">defs["needs_gold"]</span> sẽ ăn KeyError.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Cho <span class="mono">build_store</span> đọc <span class="mono">C.COHORT_DEFS</span> (một vòng lặp thay 4 dòng literal), thêm
+    <span class="mono">needs_gold=True</span> cho <span class="mono">T-unbiased</span>. Hoặc nếu quyết định giữ hardcode thì xoá
+    <span class="mono">COHORT_DEFS</span> hẳn — đừng để hai nguồn sự thật.</div></div>
+</div>
+
+<h3><span class="mono">scripts/probe_complaint_composition.py</span></h3>
+<div class="item">
+  <div class="hd">#18 — Probe nhân bản hằng số và đã lệch khỏi <span class="mono">config</span> <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">WEST</span> / <span class="mono">ASIA</span> / <span class="mono">CODES</span> / <span class="mono">MIN_STRATUM</span> / <span class="mono">bloc</span> ở đầu file</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Probe khai báo lại toàn bộ taxonomy strata thay vì <span class="mono">from prism import config</span>, và đã lệch (đã kiểm chứng):
+    <span class="mono">config.WEST_COUNTRIES</span> có <span class="mono">"phần lan"</span>, probe <b>không</b> → mọi review Phần Lan vào bloc
+    <span class="mono">OTH</span> ở probe và <span class="mono">WEST</span> ở pipeline. <span class="mono">CODES</span> của probe có thêm
+    <span class="mono">AM_WIFI, FAC_CLIMATE, AM_TRANSPORT</span> và thiếu <span class="mono">EXP_OVERALL, LOY_RETURN, FAC_INTERIOR, EXP_VALUE</span>
+    so với <span class="mono">CODES_REPORTABLE</span>. Hệ quả: con số khả thi trích trong
+    <span class="mono">docs/approach_temporal_trend.md</span> (“8/13 aspect đổi kết luận sau hiệu chỉnh”, mùa vụ 2,22× / 1,73× / 1,05×)
+    được tính trên <b>định nghĩa strata và tập aspect khác</b> với Module D — nên không tái lập được bằng cách chạy pipeline,
+    và nếu reviewer paper yêu cầu đối chiếu thì hai bảng sẽ không khớp mà không ai giải thích được vì sao.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Import từ <span class="mono">prism.config</span> + <span class="mono">prism.utils</span> (<span class="mono">country_bloc</span>,
+    <span class="mono">length_bin</span>, <span class="mono">make_stratum</span> đã có sẵn và đã có test), xoá bản sao.
+    Nếu probe cố ý dùng 13 code khác thì khai báo thành <span class="mono">PROBE_CODES</span> kèm 1 dòng lý do và ghi rõ trong docs.</div></div>
+</div>
+
+<h3><span class="mono">scripts/download_pool_photos.py</span> · Docker</h3>
+<div class="item">
+  <div class="hd">#22 — Ảnh tải về không kiểm tra nội dung; JPEG hỏng được đếm là “đã có” <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">main</span> (khối <span class="mono">urlopen</span> → <span class="mono">dest.write_bytes</span>)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div><span class="mono">resp.read()</span> được ghi thẳng ra <span class="mono">.jpg</span> mà không xem
+    <span class="mono">Content-Type</span> hay magic bytes. CDN trả trang HTML lỗi 200 (rất thường với ảnh Booking đã hết hạn) → file HTML mang tên
+    <span class="mono">.jpg</span>, kích thước &gt; 0. Lần chạy lại, nhánh resume <span class="mono">dest.exists() and size &gt; 0</span> tính nó là
+    <span class="mono">n_skip</span> (“đã có”) và đưa vào index. Sang <span class="mono">module_c.apply_verifier</span>,
+    <span class="mono">Image.open</span> ném exception, bị bắt bởi <span class="mono">except Exception: feats[uid] = None</span> →
+    quad đó không có <span class="mono">v_image</span>, <b>không có counter nào ghi lại</b>. Kết quả: log “v_image cho N/M quad” thấp bất thường
+    và không có cách nào biết vì URL chết, vì ảnh hỏng, hay vì cohort nhỏ.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Kiểm <span class="mono">resp.headers.get("Content-Type").startswith("image/")</span> + magic bytes JPEG/PNG trước khi ghi;
+    ghi ra file tạm rồi <span class="mono">rename</span> (ghi nửa vời hiện tại vẫn để lại file); trong <span class="mono">apply_verifier</span> đếm riêng
+    <span class="mono">n_decode_fail</span> và log ra. Phụ: <span class="mono">if args.limit and n_new &gt;= args.limit: continue</span> nên
+    <span class="mono">break</span> khi không cần quét tiếp để index (hiện quét hết 1,9M dòng sau khi đã đủ limit).</div></div>
+</div>
+<div class="item">
+  <div class="hd">#21 — Docker không pin version; tên file <span class="mono">vimg</span> lệch giữa README và orchestrator <span class="badge p2">P2</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">Dockerfile.torch</span> (lệnh <span class="mono">pip install</span>) · <span class="mono">kaggle_pipeline.do_step</span> (nhánh <span class="mono">c_apply_verifier</span> / <span class="mono">c_bridge</span>) vs README §4</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>(a) <span class="mono">pip install torch transformers sentencepiece accelerate</span> không pin version nào,
+    và <span class="mono">requirements.txt</span> chỉ có <span class="mono">&gt;=</span>. Với một artifact kèm paper, build lại image sau 6 tháng cho ra
+    transformers khác major → <span class="mono">generate()</span>/<span class="mono">num_beams</span> đổi hành vi và số không tái lập.
+    (b) README §4 ghi output apply_verifier là <span class="mono">outputs/extract/pool_quads.T-unbiased.vimg.jsonl.gz</span>, còn orchestrator
+    dùng <span class="mono">outputs/reliability/pool_quads_vimg.T-unbiased.jsonl.gz</span> — và step <span class="mono">c_bridge</span> tìm file
+    <b>theo đúng tên</b> qua <span class="mono">copy_in(vimg, …)</span>. Ai chạy local theo README rồi upload output lên Kaggle sẽ nhận
+    <span class="mono">FileNotFoundError: Không thấy pool_quads_vimg.T-unbiased.jsonl.gz</span> dù file có đó, tên khác.
+    (c) <span class="mono">.dockerignore</span> loại <span class="mono">tests/</span> + <span class="mono">scripts/</span>, nên image sinh ra kết quả
+    không chạy được unit test lẫn smoke test.</div></div>
+  <div class="row"><div class="k">Sửa</div><div>Pin <span class="mono">==</span> cho torch/transformers/open_clip trong <span class="mono">requirements.txt</span> và dùng
+    <span class="mono">pip install -r</span> trong Dockerfile.torch; thống nhất một tên duy nhất cho file vimg (đặt hằng số trong
+    <span class="mono">config.py</span> và dùng ở cả README, module C, orchestrator); bỏ <span class="mono">tests/</span> khỏi <span class="mono">.dockerignore</span>.</div></div>
+</div>
+
+<h3>Dọn nhỏ — gộp thành 1 commit</h3>
+<div class="item">
+  <div class="hd">#24 — Bốn hạng mục P3 độc lập <span class="badge p3">P3</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_b_data.build</span> · <span class="mono">module_b_selftrain.main</span> · <span class="mono">module_b_infer.seq_logprobs</span>/<span class="mono">seq_conf</span> · <span class="mono">smoke_test.main</span> · <span class="mono">module_c.train_verifier</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>
+    <b>(a) chrono split</b>: <span class="mono">r["review_date"][:7] &lt;= "2024-06"</span> — review thiếu ngày có <span class="mono">review_date == ""</span>,
+    và <span class="mono">""[:7] == ""</span> nhỏ hơn mọi chuỗi, nên <b>mọi review thiếu ngày rơi vào <span class="mono">chrono_train</span></b>
+    (và bị loại khỏi <span class="mono">chrono_test</span>). Probe E1c vì thế có tập early bị nhiễm dữ liệu không xác định thời gian.<br>
+    <b>(b) magic number</b>: <span class="mono">gold_neg_rate = 0.154</span> hardcode trong self-train — nếu gold được cập nhật, guardrail
+    <span class="mono">--max-skew</span> so với một con số đã chết; tính từ <span class="mono">gold_train</span> ngay tại chỗ.<br>
+    <b>(c) hàm trùng</b>: <span class="mono">seq_logprobs</span> và <span class="mono">seq_conf</span> giống nhau từng dòng trừ 2 dòng cuối —
+    hai bản sao đồng nghĩa hai lần phải sửa khi đổi <span class="mono">max_length</span> (hiện <span class="mono">160</span>/<span class="mono">192</span>
+    hardcode ở 4 chỗ trong file, độc lập với <span class="mono">--max-src</span>/<span class="mono">--max-tgt</span> của train).<br>
+    <b>(d) assert số cứng</b>: <span class="mono">assert len(hs) == 3399</span> và <span class="mono">== 23995</span> trong smoke test —
+    cập nhật gold hợp lệ làm smoke fail với <span class="mono">AssertionError</span> không thông điệp, dễ bị hiểu là code hỏng.<br>
+    <b>(e) output chết</b>: <span class="mono">train_verifier</span> ghi <span class="mono">image_feats.npy</span> + index mà không ai đọc, và
+    <span class="mono">np.stack([])</span> raise nếu không ảnh nào resolve (thay vì báo “không thấy ảnh gold ở <span class="mono">HAMOS_ROOT</span>”);
+    <span class="mono">build_verifier_dataset</span> chia cho <span class="mono">len(rows)</span> → <span class="mono">ZeroDivisionError</span> cùng tình huống.
+  </div></div>
+  <div class="row"><div class="k">Sửa</div><div>(a) lọc <span class="mono">if not r["review_date"]</span> ra một nhánh <span class="mono">chrono_unknown</span> và log số lượng;
+    (b) tính từ dữ liệu; (c) gộp thành <span class="mono">_seq_token_logprobs()</span> trả tensor, hai wrapper mỏng, đưa
+    <span class="mono">160/192</span> thành hằng số module; (d) đọc kỳ vọng từ <span class="mono">tests/expected_counts.json</span> với message chỉ vào file đó;
+    (e) xoá output không dùng, guard <span class="mono">if not feats: raise SystemExit(...)</span>.</div></div>
+</div>
+
+<h2>Phần B2 — Phát hiện thêm trong lúc sửa</h2>
+<p class="sub">Bốn hạng mục không có trong bản review đầu; #25 và #26 chỉ lộ ra khi chạy lại pipeline trên dữ liệu thật.</p>
+
+<div class="item">
+  <div class="hd">#25 — Khoá chặn leakage <span class="mono">(hotel_id, review_date)</span> RỖNG HOÀN TOÀN <span class="badge p1">P1</span> <span class="badge todo">Cần dữ liệu</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_a_store.build_gold_blocklist</span> &rarr; <span class="mono">is_gold_leak</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Docstring viết &ldquo;<i>Ba khoá chặn leakage</i>&rdquo;; thực tế chỉ <b>một</b> khoá hoạt động.
+    <span class="mono">hamos-mabsa/metadata/reviews.jsonl</span> KHÔNG có trường <span class="mono">review_date</span>, và
+    <span class="mono">metadata/reviews_with_dates.jsonl</span> (đường ưu tiên của <span class="mono">config._hamos_file</span>) không tồn tại trong bản
+    checkout hiện tại. Đo trực tiếp: <span class="mono">blocklist: 0 khoá (hotel,date) · 3.399 hotel gold</span>.
+    Hệ quả đo được: chạy lại Module A trên môi trường hiện tại cho <b><span class="mono">flag_gold_leak</span> = 1.466</b>,
+    trong khi <span class="mono">store_report.json</span> đang commit ghi <b>18.475</b> — tức <b>~17.000 dòng pool từng bị chặn nay
+    lọt vào tập được train / self-train / infer</b>. Cohort không đổi (270/1.207/514/10.629) nên không có
+    dấu hiệu nào khác để phát hiện.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Module A log <span class="mono">ERROR</span> nêu rõ file thiếu, và ghi
+    <span class="mono">blocklist_date_keys</span> / <span class="mono">blocklist_date_key_active</span> vào <span class="mono">store_report.json</span> — kiểm hai
+    trường đó trước mỗi run. README §2 có cảnh báo. <b>Còn treo</b>: bổ sung
+    <span class="mono">metadata/reviews_with_dates.jsonl</span> vào <span class="mono">hamos-mabsa</span> rồi chạy lại Module A và mọi bước sau.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#26 — Probe E1c chưa từng chạy được; trước khi sửa còn tạo split SAI <span class="badge p1">P1</span> <span class="badge todo">Cần dữ liệu</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_b_data.build</span> (khối chronological probe) &larr; <span class="mono">review_dates</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Cùng gốc với #25: gold không có <span class="mono">review_date</span>, nên <span class="mono">review_dates()</span> trả
+    <span class="mono">""</span> cho <b>toàn bộ</b> — đo được <b>0/10.711 segment</b> có ngày. Trước khi sửa,
+    <span class="mono">""[:7] == ""</span> nhỏ hơn mọi chuỗi nên điều kiện <span class="mono">&lt;= "2024-06"</span> đúng với tất cả:
+    <span class="mono">chrono_train.t2t.jsonl</span> chứa <b>toàn bộ</b> train+dev và <span class="mono">chrono_test.t2t.jsonl</span> <b>rỗng</b> — hai file
+    tên đúng, schema đúng, không cảnh báo. Ai train probe E1c trên đó là đang train trên toàn bộ dữ
+    liệu và test trên tập rỗng.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Tách nhánh <span class="mono">undated</span> khỏi cả early và late, đếm vào
+    <span class="mono">chrono_undated_excluded</span>, log <span class="mono">ERROR</span> nêu tên file cần có khi <b>không</b> segment nào có ngày.
+    Hai file chrono giờ được ghi rỗng một cách tường minh. <b>Còn treo</b>: cùng file dữ liệu với #25.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#27 — Sentinel coi file RỖNG là output hợp lệ <span class="badge p1">P1</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">kaggle_pipeline.sentinel</span> + vòng lặp <span class="mono">--step all</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Điều kiện bỏ qua step là <span class="mono">out.exists()</span>, không kiểm nội dung. Đã gặp thật trong
+    repo này: <span class="mono">outputs/extract/pool_quads.T-unbiased.jsonl.gz</span> tồn tại với <b>53 byte = 0 dòng</b>
+    (header gzip của stream rỗng). Nên <span class="mono">--step all</span> in <span class="mono">[skip] infer: đã có output …</span> rồi chạy
+    Module C/D trên tập rỗng — và Module D bản cũ vẫn ghi ra một file kết quả &ldquo;hợp lệ&rdquo; với 0 aspect.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Thêm <span class="mono">sentinel_ok()</span> (<span class="mono">MIN_SENTINEL_BYTES = 200</span>) và nhánh
+    <span class="mono">[rerun]</span> in rõ &ldquo;tồn tại nhưng RỖNG&rdquo;. Đồng thời <span class="mono">module_d_drift.load_quads</span> nay
+    <span class="mono">SystemExit</span> khi <span class="mono">n_used == 0</span> thay vì ghi kết quả trên tập rỗng, và <span class="mono">module_b_infer</span>
+    log <span class="mono">ERROR</span> khi ghi 0 quad. Có test: <span class="mono">test_sentinel_rejects_empty_file</span>.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#28 — Rescore bị truncate làm posterior thoái hoá thành prior thuần <span class="badge p2">P2</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">module_b_infer.flush</span> (khối rescore) &rarr; <span class="mono">seq_logprobs</span></div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Bước rescore dựng <b>toàn bộ</b> target cho mỗi biến thể sentiment, nên unit có
+    <span class="mono">n</span> quad phải chấm <span class="mono">3n</span> chuỗi <b>mỗi chuỗi dài n quad</b> — chi phí bậc hai theo số quad.
+    Với <span class="mono">MAX_TGT_TOKENS=192</span>, unit nhiều quad (khoảng &ge;9–10 quad, tuỳ tokenizer) bị truncate mất
+    <b>chính cái quad đang xét</b> &rarr; cả 3 biến thể tokenize giống nhau &rarr; log-prob bằng nhau &rarr;
+    <span class="mono">p_model = (⅓,⅓,⅓)</span> &rarr; posterior thành <b>prior thuần</b>: sentiment do φ quyết định hoàn toàn,
+    <span class="mono">provenance_flip</span> bật lung tung. Không exception nào, chỉ là số. Gold có segment tới 23 quad nên
+    đường này chạm được.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div>Phát hiện bằng <span class="mono">max(lp) - min(lp) &lt; DEGENERATE_LP_EPS</span>, ghi cờ
+    <span class="mono">p_model_truncated</span> + <span class="mono">p_model_exact</span> vào từng dòng output, đếm và <span class="mono">log.warning</span> tỷ lệ
+    ở cuối run — Module C/D vì thế lọc được các quad này. Cùng lúc gộp <span class="mono">seq_logprobs</span>/<span class="mono">seq_conf</span>
+    thành MỘT lượt forward và đưa 160/192 về <span class="mono">config.MAX_SRC_TOKENS</span>/<span class="mono">MAX_TGT_TOKENS</span>.</div></div>
+</div>
+
+<div class="item">
+  <div class="hd">#28b — <span class="mono">print()</span> tiếng Việt giết cả run trên console cp1252 <span class="badge p2">P2</span> <span class="badge done">Đã sửa</span></div>
+  <div class="row"><div class="k">Vị trí</div><div><span class="mono">utils.force_utf8_stdio</span> (mới) · <span class="mono">kaggle_pipeline</span> (đầu file)</div></div>
+  <div class="row"><div class="k">Vì sao</div><div>Log và print của repo toàn tiếng Việt; console Windows mặc định cp1252 nên một dòng
+    có dấu là <span class="mono">UnicodeEncodeError</span> — gặp thật khi chạy <span class="mono">find_ckpt</span> ngoài Kaggle, exception giết cả
+    process giữa pipeline. Kaggle vốn UTF-8 nên bug này chỉ hiện ở local.</div></div>
+  <div class="row"><div class="k">Đã sửa</div><div><span class="mono">reconfigure(encoding="utf-8", errors="replace")</span> cho stdout/stderr, gọi lúc
+    import <span class="mono">prism.utils</span> và ở đầu orchestrator — mất dấu chứ không mất run.</div></div>
+</div>
+
+<h2>Phần C — Đừng đụng vào</h2>
+<p class="sub">Đang đúng, và dễ bị phá đúng lúc refactor. Mỗi mục: nó là gì + cái gì phá nó.</p>
+
+<div class="item keep">
+  <div class="hd"><span class="mono">U.quad_uid</span> — khoá nối duy nhất giữa mẫu audit người và bridge</div>
+  <p><span class="mono">make_audit_samples.quad_audit_sample</span> ghi <span class="mono">quad_uid</span> vào file cho người gán, và
+  <span class="mono">module_c.fit_bridge</span> <b>dựng lại</b> khoá đó từ pool quad bằng cùng hàm để join. Đổi format (thêm field, đổi
+  <span class="mono">[:6]</span> của hash, đổi <span class="mono">norm_text</span>) sau khi audit đã gán xong → <span class="mono">pairs</span> rỗng →
+  <span class="mono">len(pairs) &gt;= 30</span> false → khối Spearman <b>bị bỏ qua im lặng</b>, <span class="mono">go_nogo</span> không xuất hiện trong report,
+  và bridge vẫn được ghi + dùng (xem #3). Không có test nào bảo vệ parity này — hãy thêm một test dùng chung một dict quad qua cả hai đường.</p>
+</div>
+<div class="item keep">
+  <div class="hd">Cờ <span class="mono">in_gold</span> và 3 điểm chặn độc lập của nó</div>
+  <p><span class="mono">module_a_store.is_gold_leak</span> chặn bằng 3 khoá (hotel×date, hash 120 ký tự đầu, map hotel→split) và chỉ
+  <b>gắn cờ</b>, không xoá dòng. Việc loại thật xảy ra ở <b>ba chỗ riêng biệt</b>: <span class="mono">module_b_infer.units</span>,
+  <span class="mono">download_pool_photos.main</span>, <span class="mono">make_audit_samples.d0_sample</span>. Bỏ bất kỳ một trong ba
+  <span class="mono">if r["in_gold"]</span> nào là mở đường gold vào pseudo-label/train — và pipeline vẫn chạy xanh, F1 chỉ đẹp lên.
+  Nếu thêm consumer mới của <span class="mono">reviews.jsonl.gz</span>, chặn ngay ở dòng đầu vòng lặp.</p>
+</div>
+<div class="item keep">
+  <div class="hd"><span class="mono">U.benjamini_hochberg</span> — step-up có <span class="mono">prev = min(...)</span></div>
+  <p>Duyệt <b>ngược</b> từ p lớn nhất và giữ running-min để bảo đảm q-value đơn điệu. “Đơn giản hoá” thành
+  <span class="mono">p * n / rank</span> không có running-min sẽ cho q không đơn điệu (một p nhỏ hơn có thể nhận q lớn hơn) và số aspect
+  vượt FDR đổi. <span class="mono">test_bh_known_example</span> pin lại đúng tính chất này.</p>
+</div>
+<div class="item keep">
+  <div class="hd">Shrinkage ô strata nhỏ (không phải loại ô) ở cả hai kênh</div>
+  <p><span class="mono">shares_by_period</span> và <span class="mono">valence_by_period</span> shrink ô nhỏ về share/tỷ lệ gộp của kỳ
+  (prior Dirichlet/Beta cường độ <span class="mono">min_n</span>/<span class="mono">min_w</span>). Quay về loại-ô-nhỏ làm mix strata đóng góp
+  <b>tự trôi theo thời gian</b> khi một stratum teo dần → sinh trend giả <i>ngay trong kênh adj</i>, đúng thứ mà injection test được dựng để bắt.
+  Hai test <span class="mono">test_missing_stratum_contributes_neutral_pooled_share</span> và
+  <span class="mono">test_large_prior_shrinks_to_pooled</span> pin lại; đừng nới chúng.</p>
+</div>
+<div class="item keep">
+  <div class="hd"><span class="mono">apply_provenance</span> phải nhận <span class="mono">p_model</span> thật, không one-hot</div>
+  <p><span class="mono">module_b_infer</span> chấm điểm lại 3 biến thể sentiment cho từng quad bằng teacher forcing để có
+  <span class="mono">P_model(s|x)</span>. Với <span class="mono">--no-rescore</span>, fallback one-hot <span class="mono">(0.9/0.05/0.05)</span> khiến
+  posterior <b>thành hàm tất định của (s dự đoán, φ)</b> và λ mất hoàn toàn ý nghĩa — số ra vẫn có vẻ hợp lý.
+  Cờ đó chỉ để debug tốc độ; đừng để nó vào bất kỳ script sinh số chính thức, và đừng “tối ưu” bằng cách bỏ bước rescore.</p>
+</div>
+<div class="item keep">
+  <div class="hd">Bootstrap: MỘT bản resample composition dùng chung cho mọi aspect</div>
+  <p>Vòng bootstrap trong <span class="mono">run</span> resample review trong strata một lần rồi tính slope cho <b>tất cả</b> aspect từ cùng bản
+  resample đó. Đổi thành resample riêng từng aspect (trực giác “sạch hơn”) sẽ phá tương quan giữa các share của cùng một composition —
+  các share cộng lại bằng 1, nên chúng <b>phải</b> chia sẻ cùng phương án resample. Cũng nhanh hơn <span class="mono">|aspects|</span> lần.</p>
+</div>
+<div class="item keep">
+  <div class="hd">Reservoir sampling (Algorithm R) trong hai hàm lấy mẫu audit</div>
+  <p><span class="mono">d0_sample</span> và <span class="mono">quad_audit_sample</span> dùng <span class="mono">seen[key] += 1</span> +
+  <span class="mono">j = rng.randrange(seen[key])</span> để mọi phần tử của ô có xác suất được giữ <b>đúng bằng nhau</b> trong một lượt đọc duy nhất.
+  Thay bằng xác suất giữ cố định (<span class="mono">if rng.random() &lt; 0.01</span>) — cách viết trực quan hơn — làm mẫu lệch về các dòng đến sau,
+  tức lệch theo hotel/thời gian trong file store. Comment trong code đã ghi lý do; đừng “rút gọn” nó.</p>
+</div>
+<div class="item keep">
+  <div class="hd">E3a: xáo timestamp làm nền null <b>trước</b>, rồi mới tiêm composition</div>
+  <p>Thứ tự trong <span class="mono">main</span> là <span class="mono">inject_shuffle</span> → <span class="mono">inject_composition</span>.
+  Tiêm thẳng lên dữ liệu thật thì không thể đòi “adj im lặng”, vì dữ liệu thật <i>có thể có drift thật</i> — và verdict sẽ FAIL vì lý do sai.
+  Nhánh <span class="mono">INCONCLUSIVE</span> (cả raw và adj đều im) cũng phải giữ: gộp nó vào PASS là tự cho điểm khi injection quá yếu.
+  (Việc cần sửa là <i>cách</i> shuffle — #6 — không phải thứ tự này.)</p>
+</div>
+
+<h2>Ghi chú khi test lại</h2>
+<ul>
+  <li><b>Trạng thái hiện tại</b>: <span class="mono">PYTHONPATH=src python -m unittest discover tests</span> &rarr;
+    <b>61 tests, OK</b> (0,13s, không cần torch). 37 test cũ + 24 test hồi quy mới.</li>
+  <li><b>Test hồi quy đã thêm</b> (<span class="mono">tests/test_regressions.py</span>) — mỗi cái khoá một lỗi mà trước đây
+    không test nào bắt được: term chứa <span class="mono">|</span> / <span class="mono">&lt;/quad&gt;</span> round-trip được (#8, 7 test);
+    <span class="mono">inject_shuffle</span> giữ mọi quad cùng review ở cùng kỳ (#6, 4 test); parity
+    <span class="mono">quad_uid</span> giữa <span class="mono">make_audit_samples</span> và <span class="mono">module_c</span> (Phần C, 2 test); parity đặc trưng
+    bridge + <span class="mono">score=0.0</span> không thành 8,7 (#4, #13, 3 test); <span class="mono">find_ckpt</span> chọn round2 và ưu tiên
+    <span class="mono">selftrain_history.json</span> (#9), không còn hàm patch source (#10), sentinel từ chối file rỗng (#27);
+    <span class="mono">COHORT_DEFS</span> đủ khoá và Module A không còn literal ngưỡng (#19); ảnh HTML/JSON bị từ chối (#22).</li>
+  <li><b>Đã verify trên dữ liệu thật</b> (không chỉ test tổng hợp):
+    <ul>
+      <li><span class="mono">module_a_store</span> trên 1.949.604 dòng pool &rarr; cohort <b>270 / 1.207 / 514 / 10.629</b>,
+        khớp tuyệt đối <span class="mono">store_report.json</span> đang commit &rArr; refactor đọc <span class="mono">COHORT_DEFS</span> không đổi hành vi.</li>
+      <li><span class="mono">module_b_data</span> trên gold thật &rarr; <b>23.995 quad</b>, <span class="mono">roundtrip_mismatch</span> vắng mặt (= 0)
+        sau khi đổi sang escape + neo parse.</li>
+      <li><span class="mono">module_d_drift</span> end-to-end trên 8.645 quad tổng hợp có tiêm trend &rarr; aspect có drift
+        <span class="mono">ν-adj t=+11,19 p_perm=0,005 q=0,007</span> &ldquo;XU HƯỚNG THẬT&rdquo;; aspect phẳng
+        <span class="mono">t=0,56 p_perm=0,602 q=0,602</span> &ldquo;phẳng&rdquo;; 5 quad code ngoài taxonomy bị bỏ CÓ ĐẾM,
+        không <span class="mono">KeyError</span> (#23).</li>
+      <li>Ở ca phẳng, <span class="mono">p_perm</span> (trend, 0,602) và <span class="mono">p_perm_changepoint</span> (0,473) <b>khác nhau</b> —
+        đúng vấn đề #5: trước đây FDR chạy trên số 0,473 trong khi cột được báo cáo là
+        <span class="mono">t_stat</span> của OLS. Giờ p khớp với thống kê được báo cáo.</li>
+    </ul></li>
+  <li><b>Bất biến số học vẫn giữ</b>: <span class="mono">sum(clr(...).values()) == 0</span>; adj == raw khi chỉ 1 stratum;
+    <span class="mono">min_n &rarr; &infin;</span> &rArr; adj &rarr; share gộp; ν_raw = tỷ lệ gộp của kỳ. Thêm mới:
+    <span class="mono">by_language</span> tổng gold == <span class="mono">overall.gold</span> (ghi ra cờ <span class="mono">by_language_covers_overall</span>).</li>
+  <li><b>Smoke test giờ an toàn</b>: mọi output nằm dưới <span class="mono">outputs/drift/smoke/</span>, không còn ghi đè
+    <span class="mono">drift_results.corpus.taxonomy_code.json</span>. Không cần backup thủ công nữa (#2).</li>
+  <li><b>Kiểm go/no-go end-to-end</b> (chưa chạy được, cần audit thật): đặt
+    <span class="mono">GO_NOGO["bridge_spearman_min"] = 0.99</span>, chạy <span class="mono">--stage bridge</span> rồi <span class="mono">--stage apply</span>,
+    xác nhận không có <span class="mono">bridge.pkl</span>, có <span class="mono">bridge_NOGO.pkl</span>, và mọi dòng ra mang
+    <span class="mono">w_source: "conf_seq"</span>.</li>
+  <li><b>Trước mỗi run Module A</b>: đọc <span class="mono">store_report.json</span> &rarr; <span class="mono">blocklist_date_key_active</span>.
+    Đang là <span class="mono">false</span> (#25) &rArr; chỉ còn 1 lớp chặn leakage.</li>
+</ul>
+
+<h2>Còn treo — chặn số cuối</h2>
+<div class="item warn">
+  <div class="hd">Bổ sung <span class="mono">metadata/reviews_with_dates.jsonl</span> vào <span class="mono">hamos-mabsa</span> <span class="badge todo">P1</span></div>
+  <p>Đây là <b>một file duy nhất</b> đang chặn hai hạng mục: #25 (khoá blocklist theo ngày &rarr;
+  ~17.000 dòng pool lẽ ra bị chặn đang lọt vào training) và #26 (probe E1c bất khả thi).
+  Có file rồi thì chạy lại <span class="mono">module_a_store</span> &rarr; xác nhận <span class="mono">flag_gold_leak</span> quay về ~18.475 và
+  <span class="mono">blocklist_date_key_active: true</span> &rarr; chạy lại toàn bộ bước sau (store là đầu vào của mọi thứ).
+  Code phía pipeline đã sẵn, không cần sửa gì thêm.</p>
+</div>
+<div class="item warn">
+  <div class="hd">D-a (hiệu chỉnh recall) vẫn là stub <span class="badge todo">P1</span></div>
+  <p>Cần: tập audit D0 gán xong &rarr; <span class="mono">recall_table.json</span> &rarr; <b>viết bước áp thật</b> (nhân
+  <span class="mono">1/&rho;&#770;(sentiment, length_bin)</span> vào <span class="mono">w</span> trong <span class="mono">load_quads</span>, nơi đã có <span class="mono">n_words</span>
+  trên từng quad) &rarr; chạy lại Module D. Hiện tại đã <b>không thể sinh số cuối một cách im lặng</b>:
+  Module D log <span class="mono">WARNING</span>, ghi <span class="mono">"recall_adjusted": false</span> vào JSON, và
+  <span class="mono">--final</span> thì <span class="mono">SystemExit</span>.</p>
+</div>
+<div class="item warn">
+  <div class="hd">Human audit 300 quad — nhánh Spearman vẫn chưa chạy lần nào <span class="badge todo">P2</span></div>
+  <p>Ngưỡng go/no-go thứ ba (<span class="mono">bridge_spearman_min = 0.30</span>) chưa được thực thi trên dữ liệu thật.
+  Chạy thử với 30 dòng audit giả (gán ngẫu nhiên) chỉ để xác nhận nhánh không crash và khoá join khớp
+  — <b>trước</b> khi giao 300 quad cho người gán. Parity khoá đã có test tự động, nhưng đường code
+  <span class="mono">fit_bridge</span> &rarr; <span class="mono">spearmanr</span> thì chưa.</p>
+</div>
+<div class="item warn">
+  <div class="hd">Freeze phiên bản dependency trước khi chạy số cuối <span class="badge todo">P2</span></div>
+  <p><span class="mono">requirements.txt</span> giờ có chặn trên theo major (chống breaking change), nhưng artifact kèm
+  paper cần bản chính xác: <span class="mono">pip freeze &gt; requirements.lock.txt</span> rồi commit.
+  <span class="mono">Dockerfile.torch</span> đã tự ưu tiên file lock nếu có.</p>
+</div>
+
+<p class="foot">
+Bản này = review + <b>đã áp dụng sửa</b> trên commit gốc <span class="mono">7f5bc5d</span>.
+Trạng thái build: <b>61/61 unit test PASS</b>; Module A + Module B-data + Module D đã chạy lại trên
+dữ liệu thật (kết quả ghi trong <i>Ghi chú khi test lại</i>). Chưa chạy: Module B train/infer/eval và
+Module C (cần GPU / ảnh gold), <span class="mono">smoke_test</span> đầy đủ.
+Hai hạng mục #25 &amp; #26 <b>không đóng được bằng code</b> — chờ dữ liệu; chúng nay báo lỗi tường minh.
+Quy ước: <b>Vị trí ghi theo tên hàm, không theo số dòng</b> — số dòng hết hạn ở commit sau, tên hàm thì không.
+</p>
+</body>
+</html>

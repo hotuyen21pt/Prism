@@ -1,0 +1,29 @@
+# PRISM — image cho các bước cần torch (Module B infer/train/eval).
+# torch bản CPU-only (nhẹ hơn ~1GB so với bản CUDA). Nếu có GPU + nvidia-container
+# toolkit thì đổi index-url sang bản cu121 và thêm --gpus all lúc chạy.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Cài theo requirements.txt (CÓ chặn trên version) thay vì `pip install transformers`
+# không pin — image phải tái lập được vì đây là artifact kèm paper.
+# Có requirements.lock.txt (pip freeze) thì ưu tiên dùng nó.
+COPY requirements.txt requirements.lock.tx[t] ./
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+ && if [ -f requirements.lock.txt ]; then \
+        pip install --no-cache-dir -r requirements.lock.txt; \
+    else \
+        pip install --no-cache-dir -r requirements.txt; \
+    fi
+
+COPY src/ ./src/
+# tests/ + scripts/ đi kèm: image sinh ra kết quả PHẢI chạy được unit test và smoke test
+COPY tests/ ./tests/
+COPY scripts/ ./scripts/
+
+ENV PYTHONPATH=/app/src \
+    PRISM_TABSA_ROOT=/app \
+    PYTHONUNBUFFERED=1 \
+    TOKENIZERS_PARALLELISM=false
+
+CMD ["python", "-m", "prism.module_b_infer", "--cohort", "T-unbiased"]

@@ -14,6 +14,24 @@ from typing import Any, Iterable, Iterator
 from . import config as C
 
 # ------------------------------------------------------------------------ logging
+def force_utf8_stdio() -> None:
+    """Ép stdout/stderr sang UTF-8.
+
+    Log và print của repo này toàn tiếng Việt. Console Windows mặc định cp1252,
+    nên một dòng log có dấu là UnicodeEncodeError -> giết cả run (đã gặp thật khi
+    chạy orchestrator ngoài Kaggle). errors='replace' để mất dấu chứ không mất run.
+    """
+    import sys
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass        # stream đã bị thay (pytest capture) hoặc không hỗ trợ
+
+
+force_utf8_stdio()
+
+
 def get_logger(name: str) -> logging.Logger:
     lg = logging.getLogger(name)
     if not lg.handlers:

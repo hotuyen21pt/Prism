@@ -13,12 +13,13 @@ Hai kênh, mỗi kênh có cả bản thô (raw) và bản hiệu chỉnh thành
      direct standardization trên strata (tử/mẫu tính trong từng ô rồi lấy
      trung bình theo tỷ trọng tham chiếu). Đây là estimand trung tâm của paper.
 
-Bước  : D-a hiệu chỉnh recall (nếu có recall_table.json từ tập audit D0)
+Bước  : D-a hiệu chỉnh recall — CHƯA IMPLEMENT (stub, chỉ log). --final sẽ chặn
         D-b direct standardization trên strata (tham chiếu = gộp toàn kỳ)
         khử mùa vụ (trừ trung bình tháng-trong-năm) -> OLS trend + best-split
-        changepoint -> permutation null RIÊNG TỪNG CHUỖI
-        BH-FDR: lưới adj (π-adj ∪ ν-adj) là kết quả chính; lưới raw FDR riêng
-        để so sánh like-for-like trong injection test (E3a)
+        changepoint -> permutation null RIÊNG TỪNG CHUỖI cho CẢ HAI thống kê
+        (p_perm = trend, p_perm_changepoint = bước nhảy — hai kiểm định khác nhau)
+        BH-FDR trên thống kê TREND: lưới adj (π-adj ∪ ν-adj) là kết quả chính;
+        lưới raw FDR riêng để so sánh like-for-like trong injection test (E3a)
         Bootstrap CI cho slope π-adj (resample review TRONG strata)
 
 Chạy:  python3 -m prism.module_d_drift --quads outputs/reliability/quads_weighted.jsonl.gz \
@@ -53,15 +54,24 @@ def load_quads(path, level: str, cohort_hotels: set[str]):
     rev_acc = collections.defaultdict(lambda: collections.defaultdict(
         lambda: collections.defaultdict(float)))
     n_used = 0
+    n_bad_code = 0
     for q in U.read_jsonl(path):
         if cohort_hotels and q["hotel_id"] not in cohort_hotels:
             continue
-        a = q["taxonomy_code"] if level == "taxonomy_code" else q["aspect_category"]
-        if level == "taxonomy_code" and a not in C.CODES_REPORTABLE:
-            a = C.CODE2CAT[q["taxonomy_code"]]        # gộp code hiếm lên category
+        # Lọc w TRƯỚC khi tra taxonomy: apply_weights chủ ý đặt w=0 cho code ngoài
+        # taxonomy, nhưng nếu tra CODE2CAT trước thì KeyError xảy ra trước cả nhánh
+        # bỏ đó -> cả run chết ở một dòng bất kỳ giữa 1,9M dòng.
         w = q.get("w", q.get("conf_seq", 1.0))
         if w <= 0:
             continue
+        code = q["taxonomy_code"]
+        cat = C.CODE2CAT.get(code)
+        if cat is None:
+            n_bad_code += 1
+            continue          # code ngoài taxonomy -> bỏ, có đếm, không crash
+        a = code if level == "taxonomy_code" else cat
+        if level == "taxonomy_code" and a not in C.CODES_REPORTABLE:
+            a = cat                                   # gộp code hiếm lên category
         per, st = q["period"], tuple(q["stratum"])
         vcell[(per, st)][a][q["sentiment"]] += w
         if q["phi"] == "NEG" or q["sentiment"] == "negative":
@@ -70,6 +80,12 @@ def load_quads(path, level: str, cohort_hotels: set[str]):
         n_used += 1
     reviews = {k: list(v.items()) for k, v in rev_acc.items()}
     log.info("dùng %d quad", n_used)
+    if n_bad_code:
+        log.warning("bỏ %d quad có taxonomy_code ngoài CODE2CAT", n_bad_code)
+    if not n_used:
+        raise SystemExit(f"KHÔNG có quad nào dùng được từ {path} — file rỗng, "
+                         f"cohort không khớp, hoặc w=0 hết. Dừng thay vì ghi ra "
+                         f"kết quả trên tập rỗng.")
     return cell, vcell, reviews
 
 
@@ -182,9 +198,13 @@ def deseason(series: list[float], periods: list[str]) -> list[float]:
 
 def ols_trend(series: list[float]) -> tuple[float, float]:
     n = len(series)
+    if n < 2:
+        return 0.0, 0.0                             # chuỗi 1 điểm: sxx = 0
     xs = list(range(n))
     mx, my = sum(xs) / n, sum(series) / n
     sxx = sum((x - mx) ** 2 for x in xs)
+    if sxx == 0:
+        return 0.0, 0.0
     b = sum((x - mx) * (y - my) for x, y in zip(xs, series)) / sxx
     res = [y - (my + b * (x - mx)) for x, y in zip(xs, series)]
     se = math.sqrt(sum(r * r for r in res) / (n - 2) / sxx) if n > 2 else 0.0
@@ -200,22 +220,40 @@ def best_split(series: list[float]) -> tuple[int, float]:
     return best_i, best_t
 
 
-def permutation_p(series: list[float], periods: list[str], obs_t: float,
-                  n_perm: int, rng: random.Random) -> float:
-    """Null RIÊNG cho chuỗi này: xáo trộn thứ tự thời gian, giữ nguyên giá trị."""
-    hits = 0
+def permutation_p(series: list[float], periods: list[str],
+                  obs_trend_t: float, obs_cp_t: float,
+                  n_perm: int, rng: random.Random) -> tuple[float, float]:
+    """Null RIÊNG cho chuỗi này: xáo trộn thứ tự thời gian, giữ nguyên giá trị.
+
+    Trả (p của thống kê TREND, p của thống kê CHANGEPOINT) — HAI kiểm định khác
+    nhau, tính trong cùng một vòng permutation.
+
+    Bản cũ chỉ permute thống kê changepoint rồi báo cáo p đó cạnh slope OLS, nên
+    `significant_after_fdr` thực chất là "có bước nhảy", trong khi verdict lại gate
+    trên dấu slope: aspect trôi đơn điệu mạnh mà không có bước nhảy bị gọi là
+    "phẳng", còn bước nhảy sạch với slope ~0 được gọi là "XU HƯỚNG THẬT".
+    """
+    hit_trend = hit_cp = 0
     for _ in range(n_perm):
         sh = series[:]
         rng.shuffle(sh)
-        _, t = best_split(deseason(sh, periods))
-        if t >= obs_t:
-            hits += 1
-    return (hits + 1) / (n_perm + 1)
+        de = deseason(sh, periods)
+        _, t_cp = best_split(de)
+        _, t_tr = ols_trend(de)
+        if abs(t_tr) >= obs_trend_t:
+            hit_trend += 1
+        if t_cp >= obs_cp_t:
+            hit_cp += 1
+    return ((hit_trend + 1) / (n_perm + 1), (hit_cp + 1) / (n_perm + 1))
 
 
 def channel_stats(series: list[float | None], periods: list[str],
                   n_perm: int, rng: random.Random) -> dict | None:
-    """Trend + changepoint + permutation-p cho một chuỗi; None nếu <12 điểm."""
+    """Trend + changepoint + permutation-p cho một chuỗi; None nếu <12 điểm.
+
+    `p_perm` là p của THỐNG KÊ TREND (khớp với slope_per_year/t_stat được báo cáo
+    và với verdict). `p_perm_changepoint` là p của bước nhảy, báo cáo riêng.
+    """
     pts = [(v, p) for v, p in zip(series, periods) if v is not None]
     if len(pts) < 12:
         return None
@@ -224,10 +262,12 @@ def channel_stats(series: list[float | None], periods: list[str],
     de = deseason(vals, pers)
     slope, t = ols_trend(de)
     ci, ct = best_split(de)
-    p = permutation_p(vals, pers, ct, n_perm, rng)
+    p_tr, p_cp = permutation_p(vals, pers, abs(t), ct, n_perm, rng)
     return {"slope_per_year": round(slope, 4), "t_stat": round(t, 2),
             "changepoint": pers[ci] if ci >= 0 else None,
-            "welch_t": round(ct, 2), "p_perm": round(p, 5)}
+            "welch_t": round(ct, 2),
+            "p_perm": round(p_tr, 5),                 # kiểm định TREND (chính)
+            "p_perm_changepoint": round(p_cp, 5)}     # kiểm định BƯỚC NHẢY
 
 
 # ----------------------------------------------------------------------- main
@@ -252,13 +292,19 @@ def run(args) -> None:
     ref = reference_composition(cell)
     ref_v = reference_composition_valence(vcell)
 
-    # D-a: hiệu chỉnh recall nếu có bảng từ tập audit D0
+    # D-a: hiệu chỉnh recall — CHƯA IMPLEMENT (stub).
+    # Log phải nói đúng sự thật: bản cũ in "áp dụng recall_table.json" trong khi
+    # chỉ đọc file rồi bỏ, nên người đọc log tin rằng số đã hiệu chỉnh recall.
     rec_path = C.DRIFT_DIR / "recall_table.json"
+    recall_adjusted = False
     if rec_path.exists():
-        log.info("D-a: áp dụng recall_table.json")
-        rec = json.loads(rec_path.read_text())     # {"positive|L0": rho, ...}
-        # (áp ở bước load — để đơn giản, nhân 1/rho vào cell theo sentiment×bin
-        #  yêu cầu quads mang n_words; phiên bản này áp ở mức valence)
+        log.warning("D-a: THẤY %s nhưng CHƯA áp dụng (bước hiệu chỉnh recall vẫn là "
+                    "stub) -> mọi số π/ν dưới đây CHƯA hiệu chỉnh recall", rec_path.name)
+        if args.final:
+            raise SystemExit(
+                "--final: không sinh số cuối khi D-a còn là stub. Implement bước áp "
+                "recall_table (nhân 1/ρ̂(sentiment, length_bin) vào w trong load_quads) "
+                "hoặc bỏ --final và ghi rõ đây là giới hạn của bài.")
     else:
         log.info("D-a: BỎ QUA (chưa có recall_table.json từ tập audit D0)")
 
@@ -346,16 +392,20 @@ def run(args) -> None:
         for prefix, r_tag, a_tag in (("verdict", "raw", "adj"),
                                      ("verdict_val", "val_raw", "val_adj")):
             r_sig, a_sig = sig(row, r_tag), sig(row, a_tag)
-            sr = (row.get(r_tag) or {}).get("slope_per_year") or 0.0
-            sa = (row.get(a_tag) or {}).get("slope_per_year") or 0.0
-            if a_sig and r_sig and sa * sr > 0:
+            # `or 0.0` gộp "thiếu số" với "bằng 0" -> nhánh cuối gán nhãn
+            # "ĐẢO DẤU" (một kết luận rất mạnh) cho cả trường hợp sa*sr == 0.
+            sr = (row.get(r_tag) or {}).get("slope_per_year")
+            sa = (row.get(a_tag) or {}).get("slope_per_year")
+            if a_sig and r_sig and sr is not None and sa is not None and sa * sr > 0:
                 row[prefix] = "XU HƯỚNG THẬT"
             elif r_sig and not a_sig:
                 row[prefix] = "GIẢ (do thành phần)"
             elif a_sig and not r_sig:
                 row[prefix] = "BỊ CHE, lộ ra sau hiệu chỉnh"
-            elif a_sig:
+            elif a_sig and r_sig and sr is not None and sa is not None and sa * sr < 0:
                 row[prefix] = "ĐẢO DẤU sau hiệu chỉnh"
+            elif a_sig:
+                row[prefix] = "không xác định (thiếu slope hoặc slope = 0)"
             else:
                 row[prefix] = "phẳng"
 
@@ -364,6 +414,9 @@ def run(args) -> None:
     U.write_json(out, {"config": vars(args),
                        "periods": periods,          # trục của nu_*_series
                        "pi_periods": pi_periods,    # trục của pi_*_series
+                       # p_perm/p_fdr là kiểm định TREND; bước nhảy ở p_perm_changepoint
+                       "test_statistic": "ols_trend_t (permutation, null riêng từng chuỗi)",
+                       "recall_adjusted": recall_adjusted,
                        "n_significant_after_fdr": n_sig,
                        "n_significant_valence_fdr": n_sig_val,
                        "results": results})
@@ -383,15 +436,22 @@ def main() -> None:
     ap.add_argument("--level", default="taxonomy_code",
                     choices=["taxonomy_code", "aspect_category"])
     ap.add_argument("--cohort", default="corpus",
-                    choices=["A-dense", "B-anchor", "T-unbiased", "corpus"])
-    ap.add_argument("--min-stratum", type=int, default=C.MIN_STRATUM_N)
+                    choices=C.COHORTS)
+    ap.add_argument("--min-stratum", type=int, default=C.MIN_STRATUM_N,
+                    help="CƯỜNG ĐỘ PRIOR shrink ô strata về share gộp của kỳ (kênh π, "
+                         "đơn vị tổng w) — KHÔNG phải ngưỡng lọc. Số LỚN HƠN = shrink "
+                         "MẠNH HƠN = mọi chuỗi phẳng hơn.")
     ap.add_argument("--min-valence-w", type=float, default=C.MIN_VALENCE_CELL_W,
-                    help="ô (kỳ,stratum,aspect) dưới tổng trọng số này bị bỏ ở kênh ν")
+                    help="CƯỜNG ĐỘ PRIOR shrink ô về tỷ lệ gộp của kỳ (kênh ν) — "
+                         "KHÔNG phải ngưỡng lọc; xem --min-stratum")
     ap.add_argument("--n-perm", type=int, default=C.N_PERMUTATION)
     ap.add_argument("--n-boot", type=int, default=0,
                     help="0 = tắt bootstrap (bật 1000 cho kết quả cuối)")
     ap.add_argument("--fdr", type=float, default=C.FDR_ALPHA)
     ap.add_argument("--seed", type=int, default=C.RANDOM_SEED)
+    ap.add_argument("--final", action="store_true",
+                    help="đánh dấu đây là run sinh SỐ CUỐI: dừng nếu còn bước nào "
+                         "là stub (hiện tại: D-a hiệu chỉnh recall)")
     ap.add_argument("--out", default=None,
                     help="đường dẫn output; mặc định drift_results.<cohort>.<level>.json")
     run(ap.parse_args())

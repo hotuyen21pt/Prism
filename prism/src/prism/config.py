@@ -84,6 +84,12 @@ PROVENANCE_PRIOR = {
 }
 PROVENANCE_LAMBDA = 0.7      # trọng số model vs prior; chọn lại trên dev (Module B)
 
+# Giới hạn token — dùng CHUNG cho train/eval/infer. Trước đây 160/192 bị hardcode
+# rải rác 6 chỗ, đổi một chỗ là lệch giữa lúc train và lúc chấm điểm.
+# [đo] segment mean 13 từ, max 147 từ; max 23 quad/segment.
+MAX_SRC_TOKENS = 160
+MAX_TGT_TOKENS = 192
+
 # ------------------------------------------------------------------ Module D: strata
 COUNTRY_BLOCS = ["VN", "WEST", "ASIA", "OTH"]
 WEST_COUNTRIES = {
@@ -99,8 +105,18 @@ ASIA_COUNTRIES = {
 TRAVELLER_TYPES = ["Cặp đôi", "Phòng gia đình", "Khách lẻ", "Nhóm", "NA"]
 LENGTH_BINS = [(0, 15), (15, 45), (45, 10**9)]     # L0 / L1 / L2 theo số từ
 USE_LENGTH_IN_STRATA = False   # True -> 60 ô thay vì 20 (ablation robustness)
-MIN_STRATUM_N = 30             # ô dưới ngưỡng này bị bỏ qua trong kỳ đó
-MIN_VALENCE_CELL_W = 10        # kênh ν: ô (kỳ×stratum×aspect) dưới tổng w này bị bỏ
+
+# CƯỜNG ĐỘ PRIOR SHRINKAGE — KHÔNG phải ngưỡng lọc.
+# Ô strata nhỏ được kéo về share/tỷ lệ gộp của kỳ với cường độ = giá trị này
+# (đơn vị: tổng trọng số w). Loại ô nhỏ đột ngột làm mix strata đóng góp tự trôi
+# theo thời gian -> sinh trend giả ngay trong kênh adj. Đặt số LỚN HƠN nghĩa là
+# shrink MẠNH HƠN (mọi chuỗi phẳng hơn), không phải "lọc chặt hơn".
+MIN_STRATUM_N = 30             # prior Dirichlet cho kênh π (shares_by_period)
+MIN_VALENCE_CELL_W = 10        # prior Beta cho kênh ν (valence_by_period)
+
+# Điểm review mặc định khi pool không có điểm (dùng cho đặc trưng propensity IPW
+# ở Module C). [đo] mean điểm của review CÓ ảnh = 8,90 · không ảnh = 8,68.
+DEFAULT_SCORE = 8.7
 
 # ------------------------------------------------------------------ Module D: thống kê
 N_BOOTSTRAP   = 1000
@@ -110,12 +126,31 @@ T_THRESHOLD   = 2.5            # ngưỡng |t| coi là có ý nghĩa trước FD
 RANDOM_SEED   = 20260821
 
 # ---------------------------------------------------------------------- cohort
+# NGUỒN SỰ THẬT DUY NHẤT cho ngưỡng cohort — module_a_store.build_store đọc dict
+# này, không hardcode lại. Mỗi entry: needs_gold (chỉ lấy hotel có gold),
+# min_pool (số review tối thiểu trong store), gold_split (lọc theo split gold).
 COHORT_DEFS = {
-    "A-dense":    dict(needs_gold=True,  min_pool=1000),   # [đo] 276 hotel
-    "B-anchor":   dict(needs_gold=True,  min_pool=300),    # [đo] 1.221 hotel
-    "T-unbiased": dict(gold_split="test", min_pool=0), # [đo] 514 hotel — extractor chưa thấy
-    "corpus":     dict(needs_gold=False, min_pool=0),      # toàn bộ 10.631 hotel
+    "A-dense":    dict(needs_gold=True,  min_pool=1000, gold_split=None),   # [đo] 270 hotel
+    "B-anchor":   dict(needs_gold=True,  min_pool=300,  gold_split=None),   # [đo] 1.207 hotel
+    "T-unbiased": dict(needs_gold=True,  min_pool=0,    gold_split="test"), # [đo] 514 hotel — extractor chưa thấy
+    "corpus":     dict(needs_gold=False, min_pool=0,    gold_split=None),   # toàn bộ 10.629 hotel
 }
+COHORTS = list(COHORT_DEFS)
+
+# ------------------------------------------------------------- tên file dùng chung
+# Tên file phải KHỚP giữa README, module_c và scripts/kaggle_pipeline.py — orchestrator
+# Kaggle tìm input THEO TÊN, nên lệch tên là FileNotFoundError dù file có đó.
+def pool_quads_name(cohort: str) -> str:
+    return f"pool_quads.{cohort}.jsonl.gz"
+
+
+def vimg_quads_name(cohort: str) -> str:
+    """Output của Module C2 (apply_verifier) — pool quads đã gắn v_image."""
+    return f"pool_quads_vimg.{cohort}.jsonl.gz"
+
+
+AUDIT_SAMPLE_NAME = "audit_sample_300.jsonl"   # make_audit_samples ghi ra
+HUMAN_AUDIT_NAME  = AUDIT_SAMPLE_NAME          # module_c đọc vào — MỘT tên duy nhất
 
 
 @dataclass

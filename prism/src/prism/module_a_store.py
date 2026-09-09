@@ -50,6 +50,16 @@ def build_gold_blocklist() -> tuple[set[str], dict[str, set[str]], dict[str, str
         if sp:
             hotel_split[hid] = sp
     log.info("blocklist: %d khoá (hotel,date) · %d hotel gold", len(keys_date), len(keys_text))
+    if not keys_date:
+        # ĐÃ GẶP THẬT: hamos-mabsa/metadata/reviews.jsonl không có trường
+        # review_date (và metadata/reviews_with_dates.jsonl không tồn tại), nên
+        # khoá chặn #1 — "chặn thô, an toàn nhất" theo docstring — rỗng hoàn toàn
+        # và leakage chỉ còn được chặn bởi khoá hash text. Không fatal (khoá text
+        # vẫn bắt được), nhưng PHẢI lộ ra chứ không im lặng.
+        log.error("khoá chặn (hotel_id, review_date) RỖNG: %s không có trường "
+                  "'review_date'. Chỉ còn 1/2 lớp chặn leakage đang hoạt động "
+                  "(hash 120 ký tự đầu). Cần metadata/reviews_with_dates.jsonl "
+                  "để bật lại lớp này.", C.GOLD_META)
     return keys_date, keys_text, hotel_split
 
 
@@ -136,14 +146,19 @@ def build_store() -> None:
     n = U.write_jsonl(out_path, rows())
     log.info("đã ghi %d review -> %s", n, out_path)
 
-    # A8: cohort theo hotel
-    gold_hotels = set(hotel_split)
-    cohorts = {
-        "A-dense":    sorted(h for h in gold_hotels if pool_count.get(h, 0) >= 1000),
-        "B-anchor":   sorted(h for h in gold_hotels if pool_count.get(h, 0) >= 300),
-        "T-unbiased": sorted(h for h, sp in hotel_split.items() if sp == "test"),
-        "corpus":     [],   # rỗng = mọi hotel
-    }
+    # A8: cohort theo hotel — ngưỡng đọc từ C.COHORT_DEFS (nguồn sự thật duy nhất),
+    # KHÔNG hardcode lại ở đây. cohort "corpus" giữ list rỗng = mọi hotel.
+    cohorts: dict[str, list[str]] = {}
+    for name, spec in C.COHORT_DEFS.items():
+        if not spec["needs_gold"]:
+            cohorts[name] = []                      # rỗng = mọi hotel
+            continue
+        split = spec.get("gold_split")
+        cohorts[name] = sorted(
+            h for h, sp in hotel_split.items()
+            if pool_count.get(h, 0) >= spec["min_pool"]
+            and (split is None or sp == split)
+        )
     U.write_json(C.STORE_DIR / "hotel_cohorts.json", cohorts)
 
     report = {
@@ -151,8 +166,13 @@ def build_store() -> None:
         "n_written": n,
         "n_hotels": len(pool_count),
         "cohort_sizes": {k: (len(v) or len(pool_count)) for k, v in cohorts.items()},
+        "cohort_defs": {k: dict(v) for k, v in C.COHORT_DEFS.items()},
         "window": [C.WINDOW_START, C.WINDOW_END],
         "gold_leak_flagged": stats["flag_gold_leak"],
+        # Ghi ra artifact: lớp chặn nào thực sự hoạt động trong run này.
+        "blocklist_date_keys": len(keys_date),
+        "blocklist_text_hotels": len(keys_text),
+        "blocklist_date_key_active": bool(keys_date),
     }
     U.write_json(C.STORE_DIR / "store_report.json", report)
     log.info("report: %s", json.dumps(report["stats"], ensure_ascii=False))

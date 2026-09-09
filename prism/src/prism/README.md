@@ -91,7 +91,7 @@ python3 -m prism.module_a_store
 | Parse ngày | regex `ngày D tháng M năm YYYY` ([đo] 99,99% khớp; 184 null) |
 | Cắt cửa sổ | **2022-03 → 2025-02** (loại 2025-03 crawl dở + 2022-02 thưa) |
 | Dedup | khoá `(hotel,name,date,pos,neg)` — [đo] 15.137 dòng trùng |
-| **Gold blocklist** 🔴 | khoá `(hotel,date)` + hash text; gắn cờ `in_gold` — **các dòng này không bao giờ được train/self-train/infer** |
+| **Gold blocklist** 🔴 | khoá `(hotel,date)` + hash text; gắn cờ `in_gold` — **các dòng này không bao giờ được train/self-train/infer**. ⚠️ khoá `(hotel,date)` cần `review_date` trong gold metadata — xem cảnh báo dưới |
 | Strata | `country_bloc`(4) × `traveller`(5) — dùng cho hiệu chỉnh thành phần |
 | Cohort | `A-dense`(≥1000 review + gold) · `B-anchor`(≥300 + gold) · `T-unbiased`(514 hotel test — extractor chưa thấy) · `corpus` |
 
@@ -103,6 +103,19 @@ Ra: `outputs/store/reviews.jsonl.gz` (179 MB) + `store_report.json` + `hotel_coh
 over-flag là hướng an toàn (thà loại nhầm vài nghìn dòng khỏi training còn hơn lọt test set).
 Cohort: A-dense **270** · B-anchor **1.207** · T-unbiased **514** · corpus 10.629.
 Nếu `flag_gold_leak` = 0 → blocklist hỏng, dừng lại.
+
+**🔴 CẢNH BÁO — khoá `(hotel_id, review_date)` hiện KHÔNG hoạt động.**
+`hamos-mabsa/metadata/reviews.jsonl` không có trường `review_date` (và
+`metadata/reviews_with_dates.jsonl` không tồn tại trong bản checkout hiện tại), nên
+khoá chặn thô nhất rỗng hoàn toàn: `blocklist_date_keys = 0`. Chạy lại Module A
+trên môi trường hiện tại cho **`flag_gold_leak` = 1.466** thay vì 18.475 — tức
+**~17.000 dòng pool từng bị chặn nay lọt vào tập được train/infer**. Module A log
+`ERROR` và ghi `blocklist_date_key_active: false` vào `store_report.json`; **kiểm
+trường đó trước mỗi run**. Muốn bật lại: bổ sung `metadata/reviews_with_dates.jsonl`
+vào repo `hamos-mabsa`.
+
+**Cohort đọc từ `config.COHORT_DEFS`** (không hardcode trong Module A nữa) — đổi
+ngưỡng ở một chỗ duy nhất; `store_report.json` ghi kèm `cohort_defs` đã dùng.
 
 ---
 
@@ -223,11 +236,11 @@ python3 -m prism.module_c_reliability --stage train_verifier
 python3 scripts/download_pool_photos.py --cohort T-unbiased
 python3 -m prism.module_c_reliability --stage apply_verifier \
     --quads outputs/extract/pool_quads.T-unbiased.jsonl.gz \
-    --out   outputs/extract/pool_quads.T-unbiased.vimg.jsonl.gz
+    --out   outputs/reliability/pool_quads_vimg.T-unbiased.jsonl.gz
 
 # C3: cầu nối text->P[V=1] (kèm IPW has_photo) + đối chiếu human audit (mẫu §3.6)
 python3 -m prism.module_c_reliability --stage bridge \
-    --quads outputs/extract/pool_quads.T-unbiased.vimg.jsonl.gz \
+    --quads outputs/reliability/pool_quads_vimg.T-unbiased.jsonl.gz \
     --audit outputs/reliability/audit_sample_300.jsonl
 
 # gắn w_q cho toàn bộ quad (tự fallback conf_seq nếu NO-GO)
@@ -238,6 +251,13 @@ python3 -m prism.module_c_reliability --stage apply \
 
 Định dạng file audit người (300 quad, lấy mẫu phân tầng): mỗi dòng đã có sẵn
 `quad_uid`, người annotate chỉ điền `"correct": 0|1`.
+
+**NO-GO được CƯỠNG CHẾ trong code**, không chỉ ghi vào report: verdict đi vào
+`bridge.pkl`; NO-GO thì ghi ra `bridge_NOGO.pkl` và **xoá** `bridge.pkl` cũ nên
+`apply` không có đường dùng nhầm. Thiếu audit hoặc khớp <30 cặp cũng là NO-GO.
+`apply` còn kiểm parity đặc trưng (`feature_names` + `n_features_in_`) trước khi
+predict và dừng nếu lệch, và ghi `w_source` vào từng dòng. Fallback là `conf_seq`
+**thô** — repo chưa implement temperature scaling.
 
 **NO-GO không chặn pipeline** — `apply` fallback về `conf_seq`; bài lùi về A+B+D
 (vẫn đủ IP&M/KBS, mất mũi nhọn Information Fusion). Vì vậy **chạy C sớm** để biết scope.
@@ -264,10 +284,13 @@ Mỗi aspect cho ra **hai kênh × hai bản**:
 | **ν** | negativity rate P(neg \| nhắc aspect) — **estimand trung tâm** | tỷ lệ | ✓ | direct standardization |
 
 Ô strata nhỏ được **shrink về share/tỷ lệ gộp của kỳ** (prior cường độ
-`--min-stratum` / `--min-valence-w`) thay vì loại đột ngột — loại ô làm mix strata
+`--min-stratum` / `--min-valence-w` — đây là CƯỜNG ĐỘ PRIOR, **không** phải ngưỡng
+lọc: số lớn hơn = shrink mạnh hơn = chuỗi phẳng hơn) thay vì loại đột ngột — loại ô làm mix strata
 đóng góp tự trôi theo thời gian và sinh trend giả trong chính kênh adj (đã tái hiện
 bằng injection nền null). Mỗi chuỗi: slope/năm + t-stat + changepoint + `p_perm`
-(null riêng từng chuỗi) + `p_fdr` — **lưới FDR chính = π-adj ∪ ν-adj**; lưới raw
+(**kiểm định TREND**, null riêng từng chuỗi) + `p_perm_changepoint` (kiểm định
+bước nhảy, báo cáo riêng) + `p_fdr` (BH-FDR trên thống kê **trend**, khớp với
+slope và verdict) — **lưới FDR chính = π-adj ∪ ν-adj**; lưới raw
 FDR riêng chỉ để so like-for-like trong E3a. Bootstrap CI (kênh π, resample review
 trong strata, MỘT bản resample dùng chung cho mọi aspect) + verdict/verdict_val:
 
@@ -280,8 +303,9 @@ Trong JSON: `periods` là trục của `nu_*_series`, `pi_periods` là trục c�
 `--out` đổi đường dẫn output (mặc định `drift_results.<cohort>.<level>.json`).
 
 D-a (hiệu chỉnh recall): tạo `outputs/drift/recall_table.json` từ **tập audit D0** (§3.2).
-⚠️ Bước áp bảng recall vào ước lượng hiện là **stub** (chỉ log) — phải hoàn thiện
-khi có bảng thật, trước run kết quả cuối.
+⚠️ Bước áp bảng recall hiện là **stub**: Module D log WARNING và ghi
+`"recall_adjusted": false` vào JSON output. Chạy với `--final` thì nó **dừng hẳn**
+thay vì sinh số cuối chưa hiệu chỉnh recall.
 
 ---
 

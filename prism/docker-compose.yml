@@ -1,0 +1,44 @@
+# PRISM — chạy Module A (store) rồi Module B-data qua Docker.
+#
+# Trước khi chạy, set biến môi trường trỏ tới thư mục chứa dữ liệu raw:
+#   PowerShell:  $env:PRISM_DATA = "C:\Users\User1\Desktop\work\nckh\Prism\prism\data\raw"
+#   bash:        export PRISM_DATA=/path/to/data/raw
+#
+# Thư mục đó PHẢI chứa:
+#   hotel_booking_unlabeled.jsonl   (pool ~1,9M review — input Module A)
+#   train.jsonl  dev.jsonl  test.jsonl   (gold split, có 'quads' + 'instance_id')
+#   hotel_absa_labeled.jsonl        (GOLD_META fallback — cần cho cả A và B-data)
+#
+# Chạy:
+#   docker compose run --rm module-a
+#   docker compose run --rm module-b-data
+# Kết quả ghi vào ./outputs/ trên host (store/ và extract/).
+
+services:
+  module-a:
+    build: .
+    image: prism:ab
+    volumes:
+      - "${PRISM_DATA:?set PRISM_DATA to your data/raw folder}:/app/data/raw:ro"
+      - "./outputs:/app/outputs"
+    command: python -m prism.module_a_store
+
+  module-b-data:
+    build: .
+    image: prism:ab
+    volumes:
+      - "${PRISM_DATA:?set PRISM_DATA to your data/raw folder}:/app/data/raw:ro"
+      - "./outputs:/app/outputs"
+    command: python -m prism.module_b_data
+
+  # Cần torch — build Dockerfile.torch. Input: outputs/store/ (Module A) + models/.
+  # Chạy cohort nhỏ trước (T-unbiased), corpus sau cùng (--cohort corpus).
+  module-b-infer:
+    build:
+      context: .
+      dockerfile: Dockerfile.torch
+    image: prism:torch
+    volumes:
+      - "./outputs:/app/outputs"
+      - "./models:/app/models:ro"
+    command: python -m prism.module_b_infer --cohort T-unbiased

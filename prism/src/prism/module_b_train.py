@@ -32,8 +32,8 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--grad-accum", type=int, default=4)
     ap.add_argument("--lr", type=float, default=3e-4)
-    ap.add_argument("--max-src", type=int, default=160)   # segment mean 13 từ, max 147
-    ap.add_argument("--max-tgt", type=int, default=192)   # max 23 quad/segment
+    ap.add_argument("--max-src", type=int, default=C.MAX_SRC_TOKENS)  # segment mean 13 từ, max 147
+    ap.add_argument("--max-tgt", type=int, default=C.MAX_TGT_TOKENS)  # max 23 quad/segment
     ap.add_argument("--seed", type=int, default=C.RANDOM_SEED)
     ap.add_argument("--train-file", default=str(C.EXTRACT_DIR / "train.t2t.jsonl"),
                     help="đổi sang chrono_train.t2t.jsonl cho probe E1c")

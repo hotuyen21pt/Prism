@@ -41,7 +41,7 @@ def main() -> None:
     ap.add_argument("--test-file", default=str(C.EXTRACT_DIR / "test.t2t.jsonl"))
     ap.add_argument("--gold-file", default=str(C.SPLIT_DIR / "test.jsonl"))
     ap.add_argument("--batch", type=int, default=16)
-    ap.add_argument("--max-tgt", type=int, default=192)
+    ap.add_argument("--max-tgt", type=int, default=C.MAX_TGT_TOKENS)
     ap.add_argument("--out-prefix", default=str(C.EXTRACT_DIR / "eval"))
     args = ap.parse_args()
 
@@ -67,7 +67,8 @@ def main() -> None:
         for i in range(0, len(rows), args.batch):
             chunk = rows[i:i + args.batch]
             enc = tok([r["input"] for r in chunk], return_tensors="pt",
-                      padding=True, truncation=True, max_length=160).to(device)
+                      padding=True, truncation=True,
+                      max_length=C.MAX_SRC_TOKENS).to(device)
             out = model.generate(**enc, max_length=args.max_tgt, num_beams=4)
             for r, o in zip(chunk, out):
                 preds[r["instance_id"]] = parse_linearized(
@@ -87,9 +88,18 @@ def main() -> None:
         return prf(ng, np, nh)
 
     seg_words = lambda g: len(g["text"].split())
+
+    # "other" PHẢI là phần bù của en/vi, không phải so sánh với literal "other":
+    # langs chứa mã ngôn ngữ thật (ko/zh/fr/"?"), nên so == "other" cho ra bucket
+    # rỗng và mọi review không en/vi bị bỏ khỏi bảng -> by_language không cộng lại
+    # thành overall. Bất biến này được assert ngay dưới.
+    def lang_of(g) -> str:
+        lv = langs.get(g["source_review_id"])
+        return lv if lv in ("en", "vi") else "other"
+
     report = {
         "overall": agg(lambda g: True),
-        "by_language": {lv: agg(lambda g, lv=lv: langs.get(g["source_review_id"]) == lv)
+        "by_language": {lv: agg(lambda g, lv=lv: lang_of(g) == lv)
                         for lv in ("en", "vi", "other")},
         "by_length": {f"L{i}": agg(lambda g, i=i: C.LENGTH_BINS[i][0] <= seg_words(g)
                                    < C.LENGTH_BINS[i][1])
@@ -122,6 +132,14 @@ def main() -> None:
     for s in C.SENTIMENTS:
         report["by_polarity_quad"][s] = agg_quads(
             lambda q, s=s: q["sentiment"] == s)
+
+    # Bất biến: 3 bucket ngôn ngữ phân hoạch toàn bộ gold, nên tổng gold phải khớp
+    # overall. Lệch = có review bị bỏ đếm (bug cũ của bucket "other").
+    lang_gold = sum(v["gold"] for v in report["by_language"].values())
+    if lang_gold != report["overall"]["gold"]:
+        log.error("by_language bỏ sót: tổng gold %d != overall %d",
+                  lang_gold, report["overall"]["gold"])
+    report["by_language_covers_overall"] = lang_gold == report["overall"]["gold"]
 
     U.write_json(U.Path(f"{args.out_prefix}_report.json"), report)
     U.write_jsonl(U.Path(f"{args.out_prefix}_preds.jsonl"),

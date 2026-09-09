@@ -1,0 +1,283 @@
+"""
+Test chống hồi quy cho các lỗi đã sửa trong docs/prism_code_review.
+
+Mỗi test ở đây tương ứng một lỗi mà TRƯỚC KHI SỬA không có test nào bắt được —
+đó là lý do chúng tồn tại lâu. Đừng nới lỏng chúng; nếu một test ở đây fail thì
+lỗi cũ đã quay lại.
+"""
+import importlib.util
+import json
+import os
+import random
+import unittest
+from pathlib import Path
+
+from prism import config as C
+from prism import utils as U
+from prism.eval_injection import inject_shuffle
+from prism.module_b_data import linearize, parse_linearized
+
+
+class TestSeparatorInTerm(unittest.TestCase):
+    """#8 — ký tự phân cách trong term làm mất trắng cả quad."""
+
+    def _roundtrip(self, aspect, opinion):
+        quads = [{"aspect_term": aspect, "taxonomy_code": "FAC_ROOM",
+                  "opinion_term": opinion, "sentiment": "negative"}]
+        return parse_linearized(linearize(quads))
+
+    def test_pipe_in_aspect_survives(self):
+        out = self._roundtrip("giá | chất lượng", "kém")
+        self.assertEqual(len(out), 1, "quad có '|' trong aspect bị mất")
+        self.assertEqual(out[0]["aspect_term"], "giá | chất lượng")
+        self.assertEqual(out[0]["sentiment"], "negative")
+
+    def test_pipe_in_opinion_survives(self):
+        out = self._roundtrip("wifi", "chậm | hay mất")
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["opinion_term"], "chậm | hay mất")
+
+    def test_quad_tag_in_term_survives(self):
+        out = self._roundtrip("a </quad> b", "x <quad> y")
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["aspect_term"], "a </quad> b")
+        self.assertEqual(out[0]["opinion_term"], "x <quad> y")
+
+    def test_multi_quad_with_pipes_keeps_all(self):
+        quads = [
+            {"aspect_term": "giá | chất lượng", "taxonomy_code": "EXP_VALUE",
+             "opinion_term": "ổn", "sentiment": "positive"},
+            {"aspect_term": "phòng", "taxonomy_code": "FAC_ROOM",
+             "opinion_term": "ồn", "sentiment": "negative"},
+        ]
+        out = parse_linearized(linearize(quads))
+        self.assertEqual([q["taxonomy_code"] for q in out],
+                         ["EXP_VALUE", "FAC_ROOM"])
+
+    def test_escape_is_reversible(self):
+        for s in ("a|b", "<quad>", "</quad>", "a | b </quad> c", "bình thường"):
+            self.assertEqual(len(parse_linearized(linearize(
+                [{"aspect_term": s, "taxonomy_code": "FAC_ROOM",
+                  "opinion_term": s, "sentiment": "neutral"}]))), 1, s)
+
+    def test_model_output_with_raw_pipe_still_parses(self):
+        # model TỰ SINH '|' thô (không qua esc_term) -> neo vào code + sentiment
+        s = "<quad> giá | chất lượng | EXP_VALUE | tạm được | positive </quad>"
+        out = parse_linearized(s)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["taxonomy_code"], "EXP_VALUE")
+        self.assertEqual(out[0]["sentiment"], "positive")
+
+    def test_still_drops_genuinely_malformed(self):
+        self.assertEqual(parse_linearized("<quad> thiếu | trường </quad>"), [])
+        self.assertEqual(parse_linearized("<quad> a | XX_BAD | b | positive </quad>"), [])
+        self.assertEqual(parse_linearized("<quad> a | FAC_ROOM | b | xxx </quad>"), [])
+
+
+class TestShuffleIsReviewLevel(unittest.TestCase):
+    """#6 — xáo timestamp phải ở MỨC REVIEW, không phải mức quad."""
+
+    @staticmethod
+    def _quads():
+        out = []
+        for i in range(50):                      # mỗi review 3 quad
+            for j in range(3):
+                out.append({"review_uid": f"R{i}", "hotel_id": "H1",
+                            "period": f"2022-{(i % 12) + 1:02d}",
+                            "stratum": ["VN", "Cặp đôi"], "phi": "NEG",
+                            "taxonomy_code": "AM_FOOD", "aspect_category": "AMENITY",
+                            "sentiment": "negative", "conf_seq": 0.9, "idx": j})
+        return out
+
+    def test_all_quads_of_a_review_share_one_period(self):
+        inj = inject_shuffle(self._quads(), random.Random(1))
+        by_uid = {}
+        for q in inj:
+            by_uid.setdefault(q["review_uid"], set()).add(q["period"])
+        for uid, pers in by_uid.items():
+            self.assertEqual(len(pers), 1,
+                             f"{uid} bị xé sang {len(pers)} kỳ khác nhau")
+
+    def test_review_level_period_multiset_preserved(self):
+        quads = self._quads()
+        inj = inject_shuffle(quads, random.Random(2))
+
+        def review_periods(rows):
+            d = {}
+            for q in rows:
+                d.setdefault(q["review_uid"], q["period"])
+            return sorted(d.values())
+
+        self.assertEqual(review_periods(quads), review_periods(inj))
+
+    def test_content_untouched(self):
+        quads = self._quads()
+        inj = inject_shuffle(quads, random.Random(3))
+        for b, a in zip(quads, inj):
+            self.assertEqual(b["review_uid"], a["review_uid"])
+            self.assertEqual(b["sentiment"], a["sentiment"])
+            self.assertEqual(b["stratum"], a["stratum"])
+
+    def test_deterministic_for_same_seed(self):
+        q = self._quads()
+        a = [x["period"] for x in inject_shuffle(q, random.Random(7))]
+        b = [x["period"] for x in inject_shuffle(q, random.Random(7))]
+        self.assertEqual(a, b)
+
+
+class TestQuadUidParity(unittest.TestCase):
+    """Phần C — khoá join giữa make_audit_samples và module_c phải TRÙNG.
+
+    Hai bên dựng khoá bằng cùng hàm U.quad_uid; nếu lệch thì fit_bridge khớp 0 cặp
+    -> khối Spearman bị bỏ, go/no-go không được chấm.
+    """
+
+    QUAD = {"review_uid": "H1_20230415_00000042", "phi": "NEG",
+            "taxonomy_code": "FAC_ROOM", "opinion_term": "ồn quá",
+            "conf_seq": 0.9, "p_posterior": 0.88, "n_words": 30,
+            "provenance_flip": False, "sentiment": "negative"}
+
+    def test_audit_sample_key_matches_bridge_key(self):
+        from prism import make_audit_samples as MAS
+        from prism import module_c_reliability as MC
+        # đường của make_audit_samples: ghi quad_uid vào file audit
+        written = U.quad_uid(self.QUAD)
+        # đường của module_c: dựng lại từ pool quad
+        rebuilt = U.quad_uid(dict(self.QUAD))
+        self.assertEqual(written, rebuilt)
+        # cả hai module phải dùng ĐÚNG hàm đó, không có bản sao nội bộ
+        self.assertIs(MAS.U.quad_uid, U.quad_uid)
+        self.assertIs(MC.U.quad_uid, U.quad_uid)
+
+    def test_uid_ignores_fields_not_in_key(self):
+        # thêm trường không thuộc khoá không được đổi uid (audit gán 'correct' sau)
+        q2 = dict(self.QUAD, correct=1, w=0.5, v_image=0.7)
+        self.assertEqual(U.quad_uid(self.QUAD), U.quad_uid(q2))
+
+
+class TestBridgeFeatureParity(unittest.TestCase):
+    """#4 — fit_bridge và apply_weights phải dùng CÙNG vector đặc trưng."""
+
+    Q = {"conf_seq": 0.81, "p_posterior": 0.77, "phi": "POS",
+         "n_words": 42, "provenance_flip": True}
+
+    def test_single_definition(self):
+        from prism.module_c_reliability import (BRIDGE_FEATURE_NAMES,
+                                                bridge_features)
+        x = bridge_features(self.Q)
+        self.assertEqual(len(x), len(BRIDGE_FEATURE_NAMES))
+        self.assertEqual(BRIDGE_FEATURE_NAMES,
+                         ["conf_seq", "p_posterior", "phi_pos", "log_len", "prov_flip"])
+        self.assertEqual(x[0], 0.81)
+        self.assertEqual(x[2], 1.0)          # phi POS
+        self.assertEqual(x[4], 1.0)          # provenance_flip
+
+    def test_apply_weights_uses_the_same_helper(self):
+        # apply_weights KHÔNG được dựng list literal riêng: bắt bằng cách đếm
+        # số lần tên hàm xuất hiện trong source của module.
+        import prism.module_c_reliability as MC
+        src = Path(MC.__file__).read_text(encoding="utf-8")
+        self.assertGreaterEqual(src.count("bridge_features("), 3,
+                                "apply_weights phải gọi bridge_features, "
+                                "không dựng vector riêng")
+
+    def test_propensity_keeps_real_zero_score(self):
+        from prism.module_c_reliability import propensity_features
+        self.assertEqual(propensity_features(dict(self.Q, score=0.0))[1], 0.0)
+        self.assertEqual(propensity_features(dict(self.Q, score=None))[1],
+                         C.DEFAULT_SCORE)
+
+
+class TestFindCkptPrefersLatestRound(unittest.TestCase):
+    """#9 — orchestrator phải chọn selftrain_round LỚN NHẤT, không phải round1."""
+
+    @staticmethod
+    def _load_orchestrator():
+        path = Path(__file__).resolve().parents[1] / "scripts" / "kaggle_pipeline.py"
+        spec = importlib.util.spec_from_file_location("kaggle_pipeline", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def setUp(self):
+        import tempfile
+        self.kp = self._load_orchestrator()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        for name in ("selftrain_round1", "selftrain_round2", "seed_extractor"):
+            d = self.root / "models" / name
+            d.mkdir(parents=True)
+            (d / "model.safetensors").write_bytes(b"x")
+            (d / "config.json").write_text("{}")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_picks_highest_round(self):
+        got = self.kp.find_ckpt([str(self.root)])
+        self.assertEqual(os.path.basename(got), "selftrain_round2",
+                         "phải chọn round2, round1 là checkpoint vòng trước")
+
+    def test_history_final_ckpt_wins(self):
+        (self.root / "selftrain_history.json").write_text(json.dumps(
+            {"final_ckpt": "/somewhere/models/selftrain_round1",
+             "final_dev_f1": 0.61}), encoding="utf-8")
+        got = self.kp.find_ckpt([str(self.root)])
+        self.assertEqual(os.path.basename(got), "selftrain_round1",
+                         "selftrain_history.json phải được ưu tiên")
+
+    def test_no_source_patching_functions_remain(self):
+        # #10 — orchestrator không được quyền ghi vào src/
+        self.assertFalse(hasattr(self.kp, "patch_infer_bug"))
+        self.assertFalse(hasattr(self.kp, "patch_selftrain_batch"))
+
+    def test_sentinel_rejects_empty_file(self):
+        f = self.root / "pool_quads.T-unbiased.jsonl.gz"
+        f.write_bytes(b"\x1f\x8b" + b"\x00" * 51)     # gzip rỗng ~53 byte
+        self.assertFalse(self.kp.sentinel_ok(f),
+                         "file .gz rỗng không được coi là output hợp lệ")
+        f.write_bytes(b"\x00" * 5000)
+        self.assertTrue(self.kp.sentinel_ok(f))
+
+
+class TestCohortDefsAreUsed(unittest.TestCase):
+    """#19 — ngưỡng cohort chỉ được định nghĩa ở config.COHORT_DEFS."""
+
+    def test_every_cohort_has_full_spec(self):
+        for name, spec in C.COHORT_DEFS.items():
+            for key in ("needs_gold", "min_pool", "gold_split"):
+                self.assertIn(key, spec, f"{name} thiếu khoá {key}")
+
+    def test_module_a_reads_config_not_literals(self):
+        import prism.module_a_store as A
+        src = Path(A.__file__).read_text(encoding="utf-8")
+        self.assertIn("C.COHORT_DEFS", src)
+        self.assertNotIn(">= 1000", src)
+        self.assertNotIn(">= 300", src)
+
+
+class TestImageValidation(unittest.TestCase):
+    """#22 — ảnh tải về phải được kiểm nội dung, không chỉ kích thước > 0."""
+
+    @staticmethod
+    def _load():
+        path = Path(__file__).resolve().parents[1] / "scripts" / "download_pool_photos.py"
+        spec = importlib.util.spec_from_file_location("download_pool_photos", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_rejects_html_error_page(self):
+        m = self._load()
+        self.assertFalse(m.is_image_bytes(b"<!DOCTYPE html><html><head><title>404"))
+        self.assertFalse(m.is_image_bytes(b'{"error": "not found"}'))
+
+    def test_accepts_real_image_headers(self):
+        m = self._load()
+        self.assertTrue(m.is_image_bytes(bytes.fromhex("ffd8ffe0") + b"0" * 20))
+        self.assertTrue(m.is_image_bytes(bytes.fromhex("89504e470d0a1a0a") + b"0" * 20))
+        self.assertTrue(m.is_image_bytes(b"RIFF\x00\x00\x00\x00WEBPVP8 "))
+
+
+if __name__ == "__main__":
+    unittest.main()

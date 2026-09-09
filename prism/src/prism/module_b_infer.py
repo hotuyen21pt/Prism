@@ -24,15 +24,23 @@ Ra  :  outputs/extract/pool_quads.<cohort>.jsonl.gz
 from __future__ import annotations
 
 import argparse
+import collections
 import gzip
 import json as _json
 import math
+import random
 
 from . import config as C
 from . import utils as U
 from .module_b_data import parse_linearized, linearize, TASK_PREFIX
 
 log = U.get_logger("prism.B.infer")
+
+# Nếu 3 biến thể sentiment của cùng một quad cho log-prob gần như bằng nhau thì
+# chúng đã tokenize giống nhau — nghĩa là quad đang xét bị TRUNCATE khỏi target
+# (unit nhiều quad, vượt MAX_TGT_TOKENS). Khi đó p_model là uniform và posterior
+# thoái hoá thành prior thuần: sentiment do φ quyết định hoàn toàn, im lặng.
+DEGENERATE_LP_EPS = 1e-6
 
 
 def apply_provenance(sent_scores: dict[str, float], phi: str,
@@ -52,12 +60,17 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default=str(C.MODEL_DIR / "seed_extractor"))
     ap.add_argument("--cohort", default="T-unbiased",
-                    choices=["A-dense", "B-anchor", "T-unbiased", "corpus"])
+                    choices=C.COHORTS)
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--score-batch", type=int, default=48,
                     help="batch cho bước rescore sentiment")
     ap.add_argument("--lam", type=float, default=C.PROVENANCE_LAMBDA)
-    ap.add_argument("--limit", type=int, default=0, help="0 = không giới hạn")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="0 = không giới hạn; >0 = lấy MẪU NGẪU NHIÊN đều "
+                         "(reservoir) trên toàn cohort, không phải N unit đầu file")
+    ap.add_argument("--sample-seed", type=int, default=C.RANDOM_SEED,
+                    help="seed của mẫu --limit; self-train PHẢI đổi seed mỗi vòng "
+                         "để vòng sau thấy dữ liệu mới")
     ap.add_argument("--no-rescore", action="store_true",
                     help="bỏ bước chấm điểm P_model(s|x) thật (nhanh hơn, "
                          "posterior thoái hoá thành hàm tất định — chỉ để debug)")
@@ -89,38 +102,25 @@ def main() -> None:
                            "phi": phi, "text": r[key], "score": r["score"],
                            "has_photo": r["has_photo"], "n_words": r["n_words"]}
 
-    def seq_logprobs(inputs: list[str], targets: list[str]) -> list[float]:
-        """Tổng log-prob của target | input (teacher forcing), theo chunk."""
-        out: list[float] = []
-        for i in range(0, len(inputs), args.score_batch):
-            enc = tok(inputs[i:i + args.score_batch], return_tensors="pt",
-                      padding=True, truncation=True, max_length=160).to(device)
-            lab = tok(targets[i:i + args.score_batch], return_tensors="pt",
-                      padding=True, truncation=True, max_length=192
-                      ).input_ids.to(device)
-            lab_m = lab.clone()
-            lab_m[lab_m == tok.pad_token_id] = -100
-            with torch.no_grad():
-                logits = model(**enc, labels=lab_m).logits
-            lp = torch.log_softmax(logits.float(), dim=-1)
-            tok_lp = lp.gather(-1, lab.unsqueeze(-1)).squeeze(-1)
-            mask = (lab_m != -100).float()
-            out.extend((tok_lp * mask).sum(-1).tolist())
-        return out
+    def _score(inputs: list[str], targets: list[str]) -> tuple[list[float], list[float]]:
+        """Chấm điểm target | input bằng teacher forcing, theo chunk.
 
-    def seq_conf(inputs: list[str], targets: list[str]) -> list[float]:
-        """conf_seq = exp(trung bình log-prob token đã sinh) qua teacher forcing.
+        Trả (tổng log-prob, TRUNG BÌNH log-prob) cho từng cặp — hai thống kê duy
+        nhất mà pipeline cần, tính trong CÙNG một lượt forward để không phải chạy
+        model hai lần trên cùng dữ liệu (trước đây là hai hàm sao chép nhau).
 
         Thay cho generate(output_scores=True)+compute_transition_scores — vốn giữ
         logits full-vocab (~250k) cho MỌI bước sinh nên OOM. Ở đây chỉ gather
         log-prob của đúng token đã chọn, chunk theo score_batch."""
-        out: list[float] = []
+        sums: list[float] = []
+        means: list[float] = []
         for i in range(0, len(inputs), args.score_batch):
             enc = tok(inputs[i:i + args.score_batch], return_tensors="pt",
-                      padding=True, truncation=True, max_length=160).to(device)
+                      padding=True, truncation=True,
+                      max_length=C.MAX_SRC_TOKENS).to(device)
             lab = tok(targets[i:i + args.score_batch], return_tensors="pt",
-                      padding=True, truncation=True, max_length=192
-                      ).input_ids.to(device)
+                      padding=True, truncation=True,
+                      max_length=C.MAX_TGT_TOKENS).input_ids.to(device)
             lab_m = lab.clone()
             lab_m[lab_m == tok.pad_token_id] = -100
             with torch.no_grad():
@@ -128,15 +128,27 @@ def main() -> None:
             lp = torch.log_softmax(logits.float(), dim=-1)
             tok_lp = lp.gather(-1, lab.unsqueeze(-1)).squeeze(-1)
             mask = (lab_m != -100).float()
-            mean_lp = (tok_lp * mask).sum(-1) / mask.sum(-1).clamp(min=1)
-            out.extend(mean_lp.exp().tolist())
-        return out
+            tot = (tok_lp * mask).sum(-1)
+            sums.extend(tot.tolist())
+            means.extend((tot / mask.sum(-1).clamp(min=1)).tolist())
+        return sums, means
+
+    def seq_logprobs(inputs: list[str], targets: list[str]) -> list[float]:
+        """Tổng log-prob của target | input."""
+        return _score(inputs, targets)[0]
+
+    def seq_conf(inputs: list[str], targets: list[str]) -> list[float]:
+        """conf_seq = exp(trung bình log-prob token) — độ tin cậy mức chuỗi."""
+        return [math.exp(m) for m in _score(inputs, targets)[1]]
+
+    stats = collections.Counter()
 
     def flush(batch, fout):
         enc = tok([TASK_PREFIX + b["text"] for b in batch], return_tensors="pt",
-                  padding=True, truncation=True, max_length=160).to(device)
+                  padding=True, truncation=True,
+                  max_length=C.MAX_SRC_TOKENS).to(device)
         with torch.no_grad():
-            seqs = model.generate(**enc, max_length=192, num_beams=4)
+            seqs = model.generate(**enc, max_length=C.MAX_TGT_TOKENS, num_beams=4)
 
         texts_out = [tok.decode(s, skip_special_tokens=True) for s in seqs]
         # seq-level confidence tính bằng teacher forcing (nhẹ VRAM, không giữ full-vocab)
@@ -146,6 +158,7 @@ def main() -> None:
 
         # P_model(s|x) thật: chấm điểm 3 biến thể sentiment cho từng quad
         p_models: dict[tuple[int, int], dict[str, float]] = {}
+        degenerate: set[tuple[int, int]] = set()
         if not args.no_rescore:
             jobs, ins, tgts = [], [], []
             for bi, (b, _, quads) in enumerate(parsed):
@@ -162,6 +175,12 @@ def main() -> None:
                 for (bi, qi, s), lp in zip(jobs, lps):
                     acc.setdefault((bi, qi), {})[s] = lp
                 for key, d in acc.items():
+                    # 3 biến thể cho log-prob y hệt nhau => quad này đã bị truncate
+                    # khỏi target, p_model sẽ là uniform và posterior = prior thuần.
+                    # Đánh dấu thay vì để nó trôi vào dữ liệu như một số bình thường.
+                    if max(d.values()) - min(d.values()) < DEGENERATE_LP_EPS:
+                        degenerate.add(key)
+                        continue
                     z = max(d.values())
                     e = {s: math.exp(v - z) for s, v in d.items()}
                     t = sum(e.values())
@@ -169,10 +188,22 @@ def main() -> None:
 
         for bi, (b, conf, quads) in enumerate(parsed):
             for qi, q in enumerate(quads):
-                p_model = p_models.get((bi, qi)) or {
+                scored = p_models.get((bi, qi))
+                is_degen = (bi, qi) in degenerate
+                # Fallback one-hot xấp xỉ: dùng khi --no-rescore, hoặc khi rescore
+                # thoái hoá vì truncate. Trong cả hai trường hợp λ mất ý nghĩa nên
+                # phải ghi cờ ra dữ liệu để Module C/D lọc được.
+                p_model = scored or {
                     s: (0.9 if s == q["sentiment"] else 0.05) for s in C.SENTIMENTS}
+                stats["quads"] += 1
+                if is_degen:
+                    stats["p_model_truncated"] += 1
+                elif scored is None:
+                    stats["p_model_onehot"] += 1
                 s_post, p_post = apply_provenance(p_model, b["phi"], args.lam)
                 q.update({
+                    "p_model_exact": scored is not None,
+                    "p_model_truncated": is_degen,
                     "text": b["text"],
                     "review_uid": b["review_uid"], "hotel_id": b["hotel_id"],
                     "period": b["period"], "stratum": b["stratum"],
@@ -187,13 +218,35 @@ def main() -> None:
                 })
                 fout.write(_json.dumps(q, ensure_ascii=False) + "\n")
 
-    out_path = C.EXTRACT_DIR / f"pool_quads.{args.cohort}.jsonl.gz"
+    def sampled_units():
+        """--limit > 0: lấy mẫu ĐỀU trên toàn cohort bằng reservoir sampling
+        (Algorithm R). Bản cũ cắt N unit ĐẦU FILE, mà store ghi theo thứ tự pool
+        (gom theo hotel) — nên mẫu lệch về một tập con hotel, và mọi vòng self-train
+        đọc lại đúng cùng slice đó (không có dữ liệu mới, chỉ tự khuếch đại lỗi)."""
+        if not args.limit:
+            yield from units()
+            return
+        rng = random.Random(args.sample_seed)
+        pool: list[dict] = []
+        seen = 0
+        for u in units():
+            seen += 1
+            if len(pool) < args.limit:
+                pool.append(u)
+            else:
+                j = rng.randrange(seen)
+                if j < args.limit:
+                    pool[j] = u
+        log.info("mẫu %d/%d đơn vị (reservoir, seed=%d)",
+                 len(pool), seen, args.sample_seed)
+        rng.shuffle(pool)
+        yield from pool
+
+    out_path = C.EXTRACT_DIR / C.pool_quads_name(args.cohort)
     n_units = 0
     with gzip.open(out_path, "wt", encoding="utf-8") as fout:
         batch = []
-        for u in units():
-            if args.limit and n_units >= args.limit:
-                break
+        for u in sampled_units():
             batch.append(u); n_units += 1
             if len(batch) == args.batch:
                 flush(batch, fout); batch = []
@@ -201,7 +254,23 @@ def main() -> None:
                     log.info("  ... %d đơn vị", n_units)
         if batch:
             flush(batch, fout)
-    log.info("xong %d đơn vị -> %s", n_units, out_path)
+
+    n_quads = stats["quads"]
+    log.info("xong %d đơn vị · %d quad -> %s", n_units, n_quads, out_path)
+    if stats["p_model_truncated"]:
+        log.warning("%d/%d quad (%.2f%%) bị TRUNCATE khỏi target lúc rescore -> "
+                    "p_model thoái hoá, posterior = prior thuần (cờ p_model_truncated). "
+                    "Đây là unit nhiều quad vượt MAX_TGT_TOKENS=%d.",
+                    stats["p_model_truncated"], n_quads,
+                    100 * stats["p_model_truncated"] / max(n_quads, 1),
+                    C.MAX_TGT_TOKENS)
+    if stats["p_model_onehot"]:
+        log.warning("%d/%d quad dùng xấp xỉ one-hot (--no-rescore) — λ KHÔNG có ý "
+                    "nghĩa, không dùng cho số chính thức",
+                    stats["p_model_onehot"], n_quads)
+    if n_quads == 0:
+        log.error("KHÔNG có quad nào được ghi — file output rỗng. Kiểm tra checkpoint "
+                  "và cohort trước khi chạy Module C/D trên file này.")
 
 
 if __name__ == "__main__":

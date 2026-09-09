@@ -12,20 +12,35 @@ tính khả thi TRƯỚC khi đầu tư vào ASQP extractor. Pipeline thật ch�
 
 Chạy:  python3 scripts/probe_complaint_composition.py
 """
-import json, re, math, pickle, collections, os, unicodedata
+import json, re, math, pickle, collections, os
 from pathlib import Path
 import statistics as s
 
-ROOT   = Path(__file__).resolve().parents[1]
-HAMOS  = Path(os.environ.get('PRISM_HAMOS_ROOT', ROOT.parent / 'hamos-mabsa'))
-POOL   = Path(os.environ.get('PRISM_POOL_JSONL', ROOT / 'data/raw/hotel_booking_unlabeled.jsonl'))
-QUADS  = Path(os.environ.get('PRISM_GOLD_QUADS', HAMOS / 'data/annotations/quads.jsonl'))
-OUT    = Path(os.environ.get('PRISM_PROBE_OUT', ROOT / 'outputs/probe/outputs_cact_probe.pkl'))
-WINDOW = ('2022-03', '2025-02')      # cắt 2022-02 (thưa) và 2025-03 (crawl dở)
-MIN_STRATUM = 30                      # ô strata dưới ngưỡng này bị bỏ qua trong kỳ đó
+# Probe KHONG khai bao lai taxonomy/strata: moi hang so lay tu prism.config, moi ham
+# phan tang lay tu prism.utils. Ban cu nhan ban WEST/ASIA/CODES/MIN_STRATUM va da
+# lech that (config co 'phan lan', probe thi khong) -> so kha thi trich trong
+# docs/approach_temporal_trend.md tinh tren dinh nghia strata KHAC voi Module D.
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from prism import config as C          # noqa: E402
+from prism import utils as U           # noqa: E402
 
+ROOT   = C.TABSA_ROOT
+HAMOS  = C.HAMOS_ROOT
+POOL   = Path(os.environ.get('PRISM_POOL_JSONL', C.POOL_JSONL))
+QUADS  = Path(os.environ.get('PRISM_GOLD_QUADS', C.GOLD_QUADS))
+OUT    = Path(os.environ.get('PRISM_PROBE_OUT', C.WORK_DIR / 'probe/outputs_cact_probe.pkl'))
+WINDOW = (C.WINDOW_START, C.WINDOW_END)
+MIN_STRATUM = C.MIN_STRATUM_N
+
+# 13 code cua probe khac CODES_REPORTABLE la CO Y (probe can lexicon keyword tay).
+# Chenh lech duoc in ra luc chay de khong ai doi chieu nham voi bang cua Module D.
 CODES = ['FAC_ROOM','FAC_VIEW_LOCATION','AM_POOL','FAC_BUILDING','SER_ATTITUDE','AM_FOOD',
          'FAC_BATH','AM_ROOM_UTIL','FAC_ENV','AM_WIFI','FAC_CLIMATE','AM_TRANSPORT','SER_SUPPORT']
+assert all(c in C.CODE2CAT for c in CODES), "PROBE CODES phai thuoc taxonomy cua config"
+PROBE_ONLY   = [c for c in CODES if c not in C.CODES_REPORTABLE]
+NOT_IN_PROBE = [c for c in C.CODES_REPORTABLE if c not in CODES]
+
 
 SEED = {  # seed thủ công độ chính xác cao, lấy từ aspect_term tần suất cao nhất của gold
  'FAC_ROOM':['room','rooms','bed','beds','phòng','giường','mattress','nệm'],
@@ -42,20 +57,13 @@ SEED = {  # seed thủ công độ chính xác cao, lấy từ aspect_term tần
  'AM_TRANSPORT':['shuttle','taxi','parking','xe','đưa đón','bãi đỗ','grab'],
  'SER_SUPPORT':['check in','check-in','checkin','nhận phòng','trả phòng','check out']}
 
-WEST = {'pháp','úc','đức','vương quốc anh','mỹ','tây ban nha','hà lan','ý','bỉ','canada',
-        'thụy sĩ','thuỵ sĩ','áo','đan mạch','thụy điển','thuỵ điển','na uy','ireland',
-        'new zealand','ba lan','séc','bồ đào nha'}
-ASIA = {'nhật bản','hàn quốc','trung quốc','thái lan','singapore','malaysia','đài loan',
-        'hồng kông','indonesia','philippines','ấn độ','campuchia','lào'}
+# Dung DUNG ham phan tang cua pipeline — khong dinh nghia lai bloc()/norm().
+def norm(x):
+    return U.nfc(x).lower()
 
-norm = lambda x: unicodedata.normalize('NFC', (x or '').lower())
 
-def bloc(c):
-    c = norm(c).strip()
-    if c == 'việt nam': return 'VN'
-    if c in WEST:       return 'WEST'
-    if c in ASIA:       return 'ASIA'
-    return 'OTH'
+bloc = U.country_bloc
+
 
 def build_lexicon():
     """term -> code, chỉ giữ term có code trội >=60% và >=3 lần trong gold."""
@@ -143,6 +151,9 @@ def main():
 
     R = {k: raw(k) for k in months}; A = {k: adjusted(k) for k in months}
     print(f"{len(months)} tháng · {sum(nrev.values()):,} review có text negative · {len(ref)} strata\n")
+    print(f"CODES probe ({len(CODES)}) vs CODES_REPORTABLE: "
+          f"chi-probe={PROBE_ONLY} · thieu={NOT_IN_PROBE}")
+    print()
     print(f"{'code':20s} | {'RAW /năm':>9s} {'t':>6s} | {'ADJ /năm':>9s} {'t':>6s} | {'mùa vụ':>6s} | kết luận")
     print("-"*92)
     rows = []

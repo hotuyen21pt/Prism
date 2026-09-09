@@ -1,0 +1,2292 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>PRISM — Đặc tả pipeline (bản chi tiết)</title>
+<style>
+  @page { size: A4; margin: 13mm 11mm; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Segoe UI","Inter",system-ui,Arial,sans-serif; font-size: 9.9px; line-height: 1.48; color: #1f2430; margin: 0; }
+  h1 { font-size: 21px; margin: 0 0 2px; color: #0f172a; letter-spacing: -.2px; }
+  h2 { font-size: 13.4px; margin: 16px 0 6px; padding: 5px 9px; background: #0f172a; color: #fff; border-radius: 4px; break-after: avoid; }
+  h3 { font-size: 11.4px; margin: 11px 0 3px; color: #0f172a; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 2px; break-after: avoid; }
+  h4 { font-size: 10.2px; margin: 8px 0 2px; color: #334155; break-after: avoid; }
+  p { margin: 3px 0; }
+  .sub { color: #64748b; font-size: 9.3px; margin-bottom: 9px; }
+  .lead { background: #f1f5f9; border-left: 3px solid #0f172a; padding: 7px 10px; border-radius: 3px; margin: 8px 0 6px; }
+  table { border-collapse: collapse; width: 100%; margin: 5px 0 7px; font-size: 9.1px; }
+  th, td { border: 1px solid #d7dee8; padding: 3px 5px; text-align: left; vertical-align: top; }
+  th { background: #eef2f7; font-weight: 600; }
+  td.n, th.n { text-align: right; white-space: nowrap; }
+  code, .mono, pre { font-variant-ligatures: none; font-feature-settings: "liga" 0, "clig" 0, "calt" 0; }
+  code, .mono { font-family: "Cascadia Code","Consolas",monospace; font-size: 9px; background: #f4f6f9; padding: 0 3px; border-radius: 3px; color: #b21e35; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 7px 9px; border-radius: 4px; font-family: "Cascadia Code","Consolas",monospace; font-size: 8.6px; line-height: 1.45; white-space: pre-wrap; margin: 5px 0; break-inside: avoid; }
+  pre .c { color: #94a3b8; }
+  .item { margin: 8px 0; padding: 7px 9px; border: 1px solid #e2e8f0; border-radius: 5px; break-inside: avoid; }
+  .item .hd { font-weight: 700; font-size: 10.8px; color: #0f172a; }
+  .badge { display: inline-block; font-size: 8.2px; font-weight: 700; padding: 1px 6px; border-radius: 10px; vertical-align: middle; margin-left: 3px; }
+  .badge.new  { background: #ede9fe; color: #6d28d9; }
+  .p1 { background: #fee2e2; color: #b91c1c; }
+  .p2 { background: #fef3c7; color: #b45309; }
+  .p3 { background: #e0f2fe; color: #0369a1; }
+  .done { background: #dcfce7; color: #15803d; }
+  .todo { background: #fde68a; color: #92400e; }
+  .cpu { background: #e2e8f0; color: #334155; }
+  .gpu { background: #ede9fe; color: #6d28d9; }
+  .net { background: #cffafe; color: #0e7490; }
+  .opt { background: #f1f5f9; color: #64748b; }
+  .row { display: grid; grid-template-columns: 66px 1fr; gap: 3px 8px; margin-top: 3px; }
+  .k { color: #64748b; font-weight: 600; font-size: 8.8px; text-transform: uppercase; letter-spacing: .3px; padding-top: 1px; }
+  .keep { border-left: 3px solid #15803d; background: #f0fdf4; }
+  .warn { border-left: 3px solid #b45309; background: #fffbeb; }
+  .bad { border-left: 3px solid #b91c1c; background: #fef2f2; }
+  .fx { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #475569; padding: 5px 9px; margin: 5px 0; border-radius: 3px; font-family: "Cambria","Georgia",serif; font-size: 10.4px; break-inside: avoid; }
+  .fx .why { font-family: "Segoe UI",system-ui,sans-serif; font-size: 9.1px; color: #475569; display: block; margin-top: 3px; }
+  ul, ol { margin: 3px 0; padding-left: 17px; } li { margin: 1.5px 0; }
+  .toc { columns: 2; column-gap: 18px; font-size: 9.2px; }
+  .toc div { break-inside: avoid; margin: 1px 0; }
+  .toc .g { font-weight: 700; color: #0f172a; margin-top: 5px; }
+  .foot { margin-top: 14px; padding-top: 7px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 8.8px; }
+  .pb { break-before: page; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+  .nowrap { white-space: nowrap; }
+  .kv td:first-child { width: 132px; color: #475569; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>PRISM — Đặc tả pipeline (bản chi tiết)</h1>
+<p class="sub">
+  <b>Provenance-anchored · Reliability-calibrated · Image-verified Sentiment Monitoring</b> —
+  aspect-level sentiment drift trên 1,95M review Booking.com.<br>
+  commit <span class="mono">fc5c774</span> (2026-09-07) · biên soạn 2026-09-08 ·
+  scope: <span class="mono">prism/src/prism</span>, <span class="mono">prism/scripts</span>,
+  <span class="mono">prism/kaggle_notebooks</span>, <span class="mono">prism/tests</span>,
+  <span class="mono">prism/docs</span>, Docker ·
+  quy ước trích dẫn vị trí <b>theo tên module/hàm</b>, không dùng số dòng (số dòng đổi theo commit).
+</p>
+
+<p class="lead">
+  Tài liệu này là <b>đặc tả thực thi</b>: mọi thứ trong đây được đọc trực tiếp từ code ở commit
+  <span class="mono">fc5c774</span> — chữ ký hàm, giá trị mặc định của từng cờ CLI, schema từng file
+  output, công thức đúng như đang cài, và những chỗ <b>code khác tài liệu phương pháp</b>
+  (được đánh dấu <span class="badge p2">LỆCH</span>). Ba nhóm người đọc: (1) người chạy pipeline cần
+  biết chạy gì, theo thứ tự nào, cần file gì; (2) người viết bài cần biết con số nào là con số chính
+  thức và nó được tính bằng công thức nào; (3) người refactor cần biết bất biến nào không được phá.
+  Bằng chứng thực nghiệm và giao thức đánh giá nằm ở §14–§16, phần vận hành (Kaggle · Docker · test ·
+  bất biến) ở §17–§19, và phụ lục A–D là tra cứu nhanh (chỉ mục CLI · bản đồ file · số liệu đã đo · thuật ngữ).
+</p>
+
+<div class="item warn">
+  <div class="hd">Bản sửa đổi — đồng bộ với vòng sửa code (xem <span class="mono">docs/prism_code_review.pdf</span>)</div>
+  <p>
+    Tài liệu này đã được cập nhật sau khi áp dụng 28 hạng mục sửa từ review code. Mọi chỗ
+    đổi hành vi được đánh dấu <span class="badge new">đã đổi</span>. Tóm tắt những thay đổi
+    <b>ảnh hưởng tới cách đọc số</b>:
+  </p>
+  <table>
+    <tr><th>§</th><th>Đổi gì</th><th>Ảnh hưởng tới số</th></tr>
+    <tr><td>§5.2</td><td>Khoá blocklist <span class="mono">(hotel,date)</span> phát hiện là <b>rỗng</b> trên checkout hiện tại</td><td>🔴 <span class="mono">flag_gold_leak</span> 18.475 → 1.466; ~17.000 dòng lẽ ra bị chặn đang lọt vào training</td></tr>
+    <tr><td>§13.5</td><td><span class="mono">p_perm</span> nay là kiểm định <b>TREND</b>; bước nhảy tách sang <span class="mono">p_perm_changepoint</span></td><td>🔴 <span class="mono">n_significant_after_fdr</span> trước đây đếm <b>changepoint</b> nhưng được báo cáo cạnh slope OLS</td></tr>
+    <tr><td>§13.2</td><td>D-a vẫn là stub, nhưng nay log <span class="mono">WARNING</span>, ghi <span class="mono">recall_adjusted: false</span>, và <span class="mono">--final</span> thì dừng</td><td>Bản cũ log &ldquo;áp dụng recall_table&rdquo; trong khi không áp gì</td></tr>
+    <tr><td>§12.5</td><td>Go/no-go được <b>cưỡng chế trong code</b>: NO-GO ghi <span class="mono">bridge_NOGO.pkl</span> và xoá <span class="mono">bridge.pkl</span></td><td>Bản cũ vẫn dùng bridge NO-GO cho <span class="mono">w</span> của toàn corpus</td></tr>
+    <tr><td>§8.3</td><td>Bucket <span class="mono">by_language["other"]</span> nay là phần bù của en/vi</td><td>Bản cũ bucket này luôn rỗng và mọi review không en/vi bị bỏ đếm</td></tr>
+    <tr><td>§6.2</td><td>Term chứa <span class="mono">|</span> / <span class="mono">&lt;quad&gt;</span> được escape</td><td>Bản cũ mất trắng quad đó — recall lệch theo <i>loại term</i>, không hiện ở bảng nào</td></tr>
+    <tr><td>§8.4</td><td>Probe E1c phát hiện <b>chưa từng chạy được</b> (0/10.711 segment có ngày)</td><td>🔴 <span class="mono">chrono_train</span> từng chứa toàn bộ train+dev, <span class="mono">chrono_test</span> rỗng</td></tr>
+    <tr><td>§10.3</td><td>Rescore bị truncate nay được đánh cờ <span class="mono">p_model_truncated</span></td><td>Quad trong unit nhiều quad từng có posterior = prior thuần, im lặng</td></tr>
+    <tr><td>§14.3</td><td><span class="mono">inject_shuffle</span> xáo ở <b>mức review</b></td><td>🔴 E4 trước đây ước lượng FPR <b>thấp</b> vì phá tương quan trong review</td></tr>
+    <tr><td>§17.4</td><td>Bỏ hẳn hai bản vá source lúc chạy</td><td>—</td></tr>
+    <tr><td>§19</td><td>61 test (thêm <span class="mono">tests/test_regressions.py</span>)</td><td>—</td></tr>
+  </table>
+  <p>
+    <b>Chưa đóng được</b>: §5.2 và §8.4 chờ <span class="mono">metadata/reviews_with_dates.jsonl</span>;
+    §13.2 chờ tập audit D0.
+  </p>
+</div>
+
+<h2>Mục lục</h2>
+<div class="toc">
+  <div class="g">Phần I — Khung chung</div>
+  <div>§1 · Bài toán, chuỗi giá trị, kiến trúc 4 module</div>
+  <div>§2 · Cấu hình tập trung (<span class="mono">config.py</span>)</div>
+  <div>§3 · Dữ liệu đầu vào &amp; audit số đo</div>
+  <div>§4 · Tiện ích dùng chung (<span class="mono">utils.py</span>)</div>
+  <div class="g">Phần II — Bốn module</div>
+  <div>§5 · Module A — Temporal Quad Store</div>
+  <div>§6 · Module B-data — text-to-text</div>
+  <div>§7 · Module B-train — seed extractor mT5</div>
+  <div>§8 · Module B-eval — E1/E1b/E1c</div>
+  <div>§9 · Module B-selftrain — teacher→student</div>
+  <div>§10 · Module B-infer — pool + provenance posterior</div>
+  <div>§11 · Ảnh pool &amp; hai mẫu annotation người</div>
+  <div>§12 · Module C — Cross-modal reliability [go/no-go]</div>
+  <div>§13 · Module D — Dual-bias compositional drift</div>
+  <div class="g">Phần III — Đánh giá &amp; vận hành</div>
+  <div>§14 · Injection &amp; negative control (E3/E4)</div>
+  <div>§15 · Bằng chứng đã có (probe CACT)</div>
+  <div>§16 · Giao thức đánh giá, ablation, baseline, rủi ro</div>
+  <div>§17 · Orchestrator Kaggle &amp; chuỗi notebook</div>
+  <div>§18 · Môi trường: local · Docker · Kaggle</div>
+  <div>§19 · Test, smoke test, bất biến, trạng thái &amp; việc còn thiếu</div>
+  <div class="g">Phụ lục</div>
+  <div>A · Chỉ mục CLI đầy đủ</div>
+  <div>B · Bản đồ file toàn repo</div>
+  <div>C · Tra cứu số liệu đã đo</div>
+  <div>D · Ký hiệu &amp; thuật ngữ</div>
+</div>
+
+<h2>§1 · Bài toán, chuỗi giá trị, kiến trúc</h2>
+
+<h3>1.1 Bài toán và đại lượng cần ước lượng</h3>
+<p>
+  Câu hỏi nghiên cứu: <b>theo thời gian, khách phàn nàn về aspect nào nhiều hơn, và khi nhắc tới một
+  aspect thì họ chê nặng hơn không?</b> — ước lượng trên ~1,15M review có text (không thể annotate hết),
+  bằng một extractor có recall lệch theo cực tính/độ dài, trên một tổng thể mà <b>thành phần người viết
+  review thay đổi rất mạnh</b> (reviewer Việt Nam 89,7% → 16,1% trong 36 tháng).
+</p>
+<p>Hai đại lượng đích, tính theo từng kỳ tháng <span class="mono">t</span> và từng aspect <span class="mono">a</span>:</p>
+<div class="fx">
+  <b>π<sub>a,t</sub></b> = share-of-complaints — tỷ trọng của aspect <i>a</i> trong tổng lượt phàn nàn của kỳ <i>t</i>, phân tích trên thang CLR.
+  <span class="why">Trả lời: “khách đang phàn nàn về cái gì nhiều hơn?”. Là dữ liệu compositional (cộng lại = 1) nên buộc phải qua CLR.</span>
+</div>
+<div class="fx">
+  <b>ν<sub>a,t</sub></b> = negativity rate = P(negative | có nhắc <i>a</i>, kỳ <i>t</i>) — trên <b>mọi</b> quad, direct standardization theo strata.
+  <span class="why">Trả lời: “nhắc tới <i>a</i> thì có chê nhiều hơn không?”. <b>Đây là estimand trung tâm của bài.</b></span>
+</div>
+<p>
+  Mỗi đại lượng có <b>hai bản</b>: <span class="mono">raw</span> (thô) và <span class="mono">adj</span>
+  (đã hiệu chỉnh thành phần). Con số chính thức của paper là bản <b>adj sau BH-FDR</b>; bản raw luôn
+  được báo cáo kèm để minh bạch (§13.7, §19.4).
+</p>
+
+<h3>1.2 Chuỗi giá trị</h3>
+<pre>gold 23.995 quad ──► train extractor mT5 ──► chạy trên pool 1,9M review chưa nhãn
+   ──► gắn độ tin cậy từng quad (cross-modal, dùng ảnh) ──► drift 2 kênh có hiệu chỉnh
+       thành phần + kiểm định (permutation null riêng từng chuỗi, BH-FDR, bootstrap CI)</pre>
+
+<h3>1.3 Bốn module &amp; thứ tự bất biến</h3>
+<p>Thứ tự sau <b>không đảo được</b> vì phụ thuộc dữ liệu:</p>
+<pre>A store → B-data → B-train → (B-eval) → B-selftrain → B-infer → (photos)
+        → C(train_verifier → apply_verifier → bridge → apply) → D drift → [injection]</pre>
+<table>
+  <tr><th>Module</th><th>Tên</th><th>Vai trò một câu</th><th>File</th><th>Máy</th><th>Trạng thái</th></tr>
+  <tr>
+    <td><b>A</b></td><td>Temporal Quad Store</td>
+    <td>Biến pool thô 1,95M dòng thành corpus sạch có trục thời gian, chống leakage gold, gắn stratum/cohort</td>
+    <td><span class="mono">module_a_store.py</span></td>
+    <td><span class="badge cpu">CPU</span></td>
+    <td><span class="badge done">đã chạy thật</span></td>
+  </tr>
+  <tr>
+    <td><b>B</b></td><td>Provenance-Anchored Extraction</td>
+    <td>mT5 sinh quad (aspect, code, opinion, sentiment) + posterior kết hợp prior bất đối xứng theo ô nguồn trường</td>
+    <td><span class="mono">module_b_{data,train,eval,selftrain,infer}.py</span></td>
+    <td><span class="badge gpu">GPU</span></td>
+    <td><span class="badge done">seed đã train</span></td>
+  </tr>
+  <tr>
+    <td><b>C</b></td><td>Cross-Modal Reliability Calibration</td>
+    <td>Dùng ảnh làm “annotator miễn phí” trên tập con có ảnh → hiệu chỉnh estimator chỉ-text → áp cho toàn bộ quad</td>
+    <td><span class="mono">module_c_reliability.py</span></td>
+    <td><span class="badge gpu">GPU</span>/<span class="badge cpu">CPU</span></td>
+    <td><span class="badge todo">chưa chạy · có go/no-go</span></td>
+  </tr>
+  <tr>
+    <td><b>D</b></td><td>Dual-Bias Compositional Drift</td>
+    <td>Tách <b>lỗi đo của công cụ</b> (D-a recall) khỏi <b>đổi thành phần tổng thể</b> (D-b composition); 2 kênh × 2 bản + kiểm định</td>
+    <td><span class="mono">module_d_drift.py</span></td>
+    <td><span class="badge cpu">CPU</span></td>
+    <td><span class="badge done">khung đã kiểm chứng</span></td>
+  </tr>
+</table>
+
+<h3>1.4 Sơ đồ phụ thuộc dữ liệu</h3>
+<pre>data/raw/*.jsonl  +  hamos-mabsa/  (gold quad · segment · ảnh)
+  │
+  ├─(A)  module_a_store ─────────────► outputs/store/reviews.jsonl.gz
+  │                                    outputs/store/hotel_cohorts.json
+  │                                    outputs/store/store_report.json
+  │                                          │  store là input của selftrain, infer, photos
+  └─(B-data) module_b_data ──► outputs/extract/{train,dev,test}.t2t.jsonl
+                               outputs/extract/chrono_{train,test}.t2t.jsonl
+                                     │
+        (B-train)  ──────────────────┴──► models/seed_extractor/            (+ training_log.json)
+                                     │
+        (B-eval)   ◄─ ckpt + t2t ────┤    ──► outputs/extract/eval_report.json  [tùy chọn]
+                                     │
+        (B-selftrain) ◄─ seed + store┤    ──► models/selftrain_round&lt;r&gt;/
+                                     │        outputs/extract/selftrain_history.json (final_ckpt)
+                                     │
+        (B-infer)  ◄─ final_ckpt + store  ──► outputs/extract/pool_quads.&lt;cohort&gt;.jsonl.gz
+                                     │
+        (photos)   ◄─ store ─────────┤    ──► outputs/reliability/pool_images/*.jpg
+                                     │        outputs/reliability/pool_image_index.json
+                                     │
+        (C1) train_verifier  ◄─ gold ảnh  ──► reliability/verifier.pkl + verifier_report.json
+        (C2) apply_verifier  ◄─ pool_quads + image_index ──► reliability/pool_quads_vimg.&lt;cohort&gt;.jsonl.gz
+        (C3) bridge          ◄─ vimg + audit_sample_300  ──► reliability/bridge.pkl + bridge_report.json
+        (C4) apply           ◄─ pool_quads + bridge.pkl  ──► reliability/quads_weighted.jsonl.gz
+                                     │
+        (D)  module_d_drift  ◄───────┘    ──► outputs/drift/drift_results.&lt;cohort&gt;.&lt;level&gt;.json
+        (E)  eval_injection              ──► outputs/drift/injection_{composition,valence,shuffle}.json</pre>
+
+<h3>1.5 Ma trận step: máy, thời lượng, phụ thuộc</h3>
+<table>
+  <tr><th>#</th><th>Step</th><th>Entrypoint</th><th>Máy</th><th>Thời lượng thực tế</th><th>Chặn bởi</th></tr>
+  <tr><td>1</td><td>unit test</td><td><span class="mono">python -m unittest discover tests</span></td><td><span class="badge cpu">CPU</span></td><td>~0,15 s · 61 test</td><td>—</td></tr>
+  <tr><td>2</td><td>smoke test</td><td><span class="mono">python -m prism.smoke_test</span></td><td><span class="badge cpu">CPU</span></td><td>~2 phút (dữ liệu thật)</td><td>data/raw + hamos</td></tr>
+  <tr><td>3</td><td>store</td><td><span class="mono">python -m prism.module_a_store</span></td><td><span class="badge cpu">CPU</span></td><td>~10 phút · ra 180 MB</td><td>pool + splits + gold meta</td></tr>
+  <tr><td>4</td><td>data</td><td><span class="mono">python -m prism.module_b_data</span></td><td><span class="badge cpu">CPU</span></td><td>~10 s</td><td>splits + gold meta</td></tr>
+  <tr><td>5</td><td>audit D0</td><td><span class="mono">python -m prism.make_audit_samples</span></td><td><span class="badge cpu">CPU</span></td><td>~2 phút</td><td>store</td></tr>
+  <tr><td>6</td><td>train</td><td><span class="mono">python -m prism.module_b_train</span></td><td><span class="badge gpu">GPU</span></td><td>~66 phút (mt5-small, T4, 10 epoch)</td><td>t2t</td></tr>
+  <tr><td>7</td><td>eval</td><td><span class="mono">python -m prism.module_b_eval</span></td><td><span class="badge gpu">GPU</span> <span class="badge opt">tùy chọn</span></td><td>~10 phút / 1.890 segment</td><td>ckpt + t2t</td></tr>
+  <tr><td>8</td><td>selftrain</td><td><span class="mono">python -m prism.module_b_selftrain</span></td><td><span class="badge gpu">GPU</span></td><td>rất nặng — xem §9.5</td><td>seed ckpt + store + t2t + dev.jsonl</td></tr>
+  <tr><td>9</td><td>infer</td><td><span class="mono">python -m prism.module_b_infer</span></td><td><span class="badge gpu">GPU</span></td><td>step nặng nhất — xem §10.7</td><td>final_ckpt + store</td></tr>
+  <tr><td>10</td><td>photos</td><td><span class="mono">python scripts/download_pool_photos.py</span></td><td><span class="badge net">NET</span></td><td>~0,4 s/ảnh (rate-limit)</td><td>store</td></tr>
+  <tr><td>11</td><td>audit AUDIT</td><td><span class="mono">make_audit_samples --quads …</span></td><td><span class="badge cpu">CPU</span></td><td>~1 phút</td><td>pool_quads</td></tr>
+  <tr><td>12</td><td>c_verifier</td><td><span class="mono">module_c_reliability --stage train_verifier</span></td><td><span class="badge gpu">GPU</span></td><td>~9.219 ảnh embed một lần</td><td>hamos-mabsa (ảnh gold)</td></tr>
+  <tr><td>13</td><td>c_apply_verifier</td><td><span class="mono">--stage apply_verifier</span></td><td><span class="badge gpu">GPU</span></td><td>tỷ lệ theo số ảnh pool đã tải</td><td>verifier.pkl + image_index + pool_quads</td></tr>
+  <tr><td>14</td><td>c_bridge</td><td><span class="mono">--stage bridge</span></td><td><span class="badge cpu">CPU</span></td><td>~giây</td><td>file <span class="mono">vimg</span> (bắt buộc có <span class="mono">v_image</span>)</td></tr>
+  <tr><td>15</td><td>c_apply</td><td><span class="mono">--stage apply</span></td><td><span class="badge cpu">CPU</span></td><td>tuyến tính theo số quad</td><td>bridge.pkl + pool_quads</td></tr>
+  <tr><td>16</td><td>drift</td><td><span class="mono">python -m prism.module_d_drift</span></td><td><span class="badge cpu">CPU</span></td><td>phút → giờ (bootstrap 1000)</td><td>quads_weighted <i>hoặc</i> pool_quads</td></tr>
+  <tr><td>17</td><td>injection</td><td><span class="mono">python -m prism.eval_injection</span></td><td><span class="badge cpu">CPU</span> <span class="badge opt">tùy chọn</span></td><td>= n lần chạy drift</td><td>quads_weighted</td></tr>
+</table>
+
+<h2 class="pb">§2 · Cấu hình tập trung — <span class="mono">src/prism/config.py</span></h2>
+<p class="sub">
+  Nguyên tắc: <b>mọi hằng số và ngưỡng nằm ở một file</b>, không rải rác trong code. Giá trị có chú thích
+  <span class="mono">[đo]</span> trong source là số đã audit trực tiếp trên dữ liệu, không phải đặt tay.
+</p>
+
+<h3>2.1 Gốc đường dẫn &amp; biến môi trường override</h3>
+<table>
+  <tr><th>Hằng</th><th>Mặc định</th><th>Env override</th><th>Ghi chú</th></tr>
+  <tr><td><span class="mono">TABSA_ROOT</span></td><td><span class="mono">parents[2]</span> của <span class="mono">config.py</span> (= gốc repo <span class="mono">prism/</span>)</td><td><span class="mono">PRISM_TABSA_ROOT</span></td><td>src-layout: <span class="mono">&lt;root&gt;/src/prism/config.py</span></td></tr>
+  <tr><td><span class="mono">HAMOS_ROOT</span></td><td><span class="mono">TABSA_ROOT.parent / "hamos-mabsa"</span></td><td><span class="mono">PRISM_HAMOS_ROOT</span></td><td>repo gold quad/ảnh, đặt cạnh repo này</td></tr>
+  <tr><td><span class="mono">WORK_DIR</span></td><td><span class="mono">TABSA_ROOT/outputs</span></td><td><span class="mono">PRISM_WORK_DIR</span></td><td>gốc mọi output pipeline</td></tr>
+  <tr><td><span class="mono">MODEL_DIR</span></td><td><span class="mono">TABSA_ROOT/models</span></td><td><span class="mono">PRISM_MODEL_DIR</span></td><td>checkpoint HF</td></tr>
+  <tr><td><span class="mono">STORE_DIR</span></td><td><span class="mono">outputs/store</span></td><td>—</td><td>Module A</td></tr>
+  <tr><td><span class="mono">EXTRACT_DIR</span></td><td><span class="mono">outputs/extract</span></td><td>—</td><td>Module B</td></tr>
+  <tr><td><span class="mono">RELIAB_DIR</span></td><td><span class="mono">outputs/reliability</span></td><td>—</td><td>Module C + mẫu audit + ảnh pool</td></tr>
+  <tr><td><span class="mono">DRIFT_DIR</span></td><td><span class="mono">outputs/drift</span></td><td>—</td><td>Module D + injection + <span class="mono">recall_table.json</span></td></tr>
+</table>
+<p>
+  <b>Cơ chế tìm file gold —</b> <span class="mono">_hamos_file(name, fallback)</span> thử lần lượt
+  <span class="mono">HAMOS_ROOT/data/&lt;name&gt;</span> rồi <span class="mono">HAMOS_ROOT/&lt;name&gt;</span>,
+  nên chấp nhận cả layout <span class="mono">hamos-mabsa/data/…</span> (repo gốc) và layout phẳng
+  <span class="mono">hamos-mabsa/…</span> (khi attach trên Kaggle). Riêng
+  <span class="mono">GOLD_META</span> có <b>chuỗi fallback 3 tầng</b>:
+  <span class="mono">metadata/reviews_with_dates.jsonl</span> →
+  <span class="mono">metadata/reviews.jsonl</span> →
+  <span class="mono">data/raw/hotel_absa_labeled.jsonl</span> (bản local, chỉ metadata, <b>không</b> chứa quad).
+</p>
+<table class="kv">
+  <tr><td><span class="mono">POOL_JSONL</span></td><td><span class="mono">data/raw/hotel_booking_unlabeled.jsonl</span> — pool 1.949.604 review</td></tr>
+  <tr><td><span class="mono">SPLIT_DIR</span></td><td><span class="mono">data/raw/</span> — chứa <span class="mono">{train,dev,test}.jsonl</span></td></tr>
+  <tr><td><span class="mono">GOLD_QUADS</span></td><td><span class="mono">annotations/quads.jsonl</span> (23.995 quad)</td></tr>
+  <tr><td><span class="mono">GOLD_SEGS</span></td><td><span class="mono">metadata/segments.jsonl</span></td></tr>
+  <tr><td><span class="mono">GOLD_IMAGES</span></td><td><span class="mono">metadata/images.jsonl</span> — có <span class="mono">local_path</span> từng ảnh</td></tr>
+  <tr><td><span class="mono">IMAGE_DIR</span></td><td><span class="mono">images/</span> — 9.219 ảnh gold (986 MB)</td></tr>
+</table>
+
+<h3>2.2 Cửa sổ thời gian</h3>
+<table>
+  <tr><th>Hằng</th><th>Giá trị</th><th>Vì sao</th></tr>
+  <tr><td><span class="mono">WINDOW_START</span></td><td><span class="mono">"2022-03"</span></td><td>2022-02 chỉ có 1.391 review / 549 hotel — tháng dở dang</td></tr>
+  <tr><td><span class="mono">WINDOW_END</span></td><td><span class="mono">"2025-02"</span></td><td>2025-03 chỉ có 11.211 review (crawl dừng ngày 10/03)</td></tr>
+</table>
+<p>
+  → <b>36 kỳ tháng</b> (kiểm chứng bằng test <span class="mono">test_periods_in_window_36_months</span>).
+  Cắt hai biên là bắt buộc: tháng dở dang tự sinh “drift” giả ở đầu/cuối chuỗi.
+</p>
+
+<h3>2.3 Taxonomy</h3>
+<p>
+  6 category · 31 taxonomy code (<span class="mono">CODE2CAT</span>, <span class="mono">ALL_CODES = sorted(CODE2CAT)</span>) ·
+  3 sentiment (<span class="mono">positive · neutral · negative</span>).
+</p>
+<table>
+  <tr><th>Category</th><th>Code thuộc category</th><th class="n">Số code</th><th class="n">% quad gold</th></tr>
+  <tr><td><b>FACILITY</b></td><td><span class="mono">FAC_ROOM · FAC_VIEW_LOCATION · FAC_BUILDING · FAC_BATH · FAC_ENV · FAC_INTERIOR · FAC_CLIMATE · FAC_SECURITY</span></td><td class="n">8</td><td class="n">55,1%</td></tr>
+  <tr><td><b>AMENITY</b></td><td><span class="mono">AM_POOL · AM_FOOD · AM_ROOM_UTIL · AM_TRANSPORT · AM_WELLNESS · AM_ENT · AM_WIFI · AM_UTILITY</span></td><td class="n">8</td><td class="n">20,5%</td></tr>
+  <tr><td><b>SERVICE</b></td><td><span class="mono">SER_ATTITUDE · SER_SUPPORT · SER_OPERATION · SER_COMM · SER_PROFESSIONALISM</span></td><td class="n">5</td><td class="n">10,7%</td></tr>
+  <tr><td><b>EXPERIENCE</b></td><td><span class="mono">EXP_OVERALL · EXP_VALUE · EXP_EMOTION · EXP_SAFETY</span></td><td class="n">4</td><td class="n">8,3%</td></tr>
+  <tr><td><b>LOYALTY</b></td><td><span class="mono">LOY_RETURN · LOY_RECOMMEND · LOY_PREFERENCE</span></td><td class="n">3</td><td class="n">3,2%</td></tr>
+  <tr><td><b>BRANDING</b></td><td><span class="mono">BRA_CONSISTENCY · BRA_LUXURY · BRA_REPUTE</span></td><td class="n">3</td><td class="n">2,2%</td></tr>
+</table>
+<p>
+  <b><span class="mono">CODES_REPORTABLE</span> — 14 code có ≥300 quad gold</b>, được báo cáo drift riêng từng code:
+  <span class="mono">FAC_ROOM · FAC_VIEW_LOCATION · AM_POOL · FAC_BUILDING · SER_ATTITUDE · AM_FOOD ·
+  FAC_BATH · EXP_OVERALL · AM_ROOM_UTIL · FAC_ENV · LOY_RETURN · FAC_INTERIOR · EXP_VALUE · SER_SUPPORT</span>.
+  17 code còn lại (kể cả <span class="mono">BRA_CONSISTENCY</span> 286 và
+  <span class="mono">LOY_RECOMMEND</span> 262 — sát ngưỡng) <b>tự động gộp lên category cha</b> tại Module D
+  (§13.2). Lý do: dev có <span class="mono">BRA_REPUTE</span> n=1, test có
+  <span class="mono">AM_UTILITY</span> n=5 → F1 per-code vô nghĩa với các code hiếm.
+</p>
+
+<h3>2.4 Provenance prior (Module B)</h3>
+<p>
+  Đo trên <b>14.129 quad gold</b> xác định được ô nguồn trường (<span class="mono">review_positive</span> /
+  <span class="mono">review_negative</span>):
+</p>
+<table>
+  <tr><th>Segment lấy từ ô</th><th class="n">n</th><th class="n">→ positive</th><th class="n">→ neutral</th><th class="n">→ negative</th></tr>
+  <tr><td><span class="mono">review_positive</span> (φ=POS)</td><td class="n">11.733</td><td class="n"><b>0,931</b></td><td class="n">0,036</td><td class="n">0,033</td></tr>
+  <tr><td><span class="mono">review_negative</span> (φ=NEG)</td><td class="n">2.396</td><td class="n">0,217</td><td class="n">0,142</td><td class="n"><b>0,641</b></td></tr>
+</table>
+<p>
+  <b>Bất đối xứng 0,931 vs 0,641 là phát hiện, không phải nhiễu:</b> khách thường viết nội dung tích cực
+  ngay trong ô “chưa hài lòng” (<i>“The owner was lovely although…”</i>) và annotation gán positive ở đó
+  là <b>đúng</b>. Vì vậy prior <b>không được giả định đối xứng</b> và <b>không được dùng làm bộ lọc cứng</b>
+  — lọc cứng sẽ vứt đúng 21,7% ca khó và giàu thông tin nhất.
+  <span class="mono">PROVENANCE_LAMBDA = 0.7</span> (trọng số model vs prior; <b>phải quét lại trên dev</b>
+  λ ∈ {0,5…0,9} trước run chính thức — xem §19.5).
+</p>
+
+<h3>2.5 Strata &amp; ngưỡng ô (Module D)</h3>
+<table>
+  <tr><th>Hằng</th><th>Giá trị</th><th>Ý nghĩa</th></tr>
+  <tr><td><span class="mono">COUNTRY_BLOCS</span></td><td><span class="mono">VN · WEST · ASIA · OTH</span></td><td>4 khối quốc tịch reviewer; <span class="mono">WEST_COUNTRIES</span> 23 nước, <span class="mono">ASIA_COUNTRIES</span> 13 nước (so khớp chuỗi tiếng Việt đã hạ chữ, có cả 2 biến thể chính tả “thụy/thuỵ”)</td></tr>
+  <tr><td><span class="mono">TRAVELLER_TYPES</span></td><td><span class="mono">Cặp đôi · Phòng gia đình · Khách lẻ · Nhóm · NA</span></td><td>[đo] 4 loại chiếm 99,7% (40,8 / 24,0 / 18,9 / 16,0%)</td></tr>
+  <tr><td><span class="mono">LENGTH_BINS</span></td><td><span class="mono">[(0,15), (15,45), (45,1e9)]</span></td><td>L0 / L1 / L2 theo số từ</td></tr>
+  <tr><td><span class="mono">USE_LENGTH_IN_STRATA</span></td><td><span class="mono">False</span></td><td>False → <b>20 ô</b> (4×5); True → 60 ô (ablation robustness)</td></tr>
+  <tr><td><span class="mono">MIN_STRATUM_N</span></td><td><span class="mono">30</span></td><td>Kênh π: <b>cường độ prior shrinkage</b> của ô nhỏ (không phải ngưỡng loại — §13.3)</td></tr>
+  <tr><td><span class="mono">MIN_VALENCE_CELL_W</span></td><td><span class="mono">10</span></td><td>Kênh ν: cường độ prior Beta khi shrink ô (kỳ × stratum × aspect)</td></tr>
+</table>
+<div class="item warn">
+  <div class="hd">Lệch tài liệu ↔ code <span class="badge p2">LỆCH</span></div>
+  <p>
+    <span class="mono">docs/approach_temporal_trend.md</span> và bản PDF spec cũ ghi “ô n&lt;30 <b>bị bỏ qua</b>”.
+    Code hiện tại (sau changelog 2026-08-22) <b>không loại ô nhỏ nữa</b> mà <b>shrink về share/tỷ lệ gộp
+    của kỳ</b> với cường độ <span class="mono">min_n</span>/<span class="mono">min_w</span>. Lý do đổi:
+    loại ô đột ngột làm mix strata đóng góp tự trôi theo thời gian khi một stratum teo dần → <b>sinh trend
+    giả ngay trong kênh adj</b> (đã tái hiện được bằng composition injection trên nền null).
+  </p>
+</div>
+
+<h3>2.6 Tham số thống kê</h3>
+<table>
+  <tr><th>Hằng</th><th class="n">Giá trị</th><th>Dùng ở đâu</th></tr>
+  <tr><td><span class="mono">N_BOOTSTRAP</span></td><td class="n">1000</td><td>CI slope kênh π-adj (resample review trong strata) — <b>lưu ý CLI mặc định <span class="mono">--n-boot 0</span></b>, phải truyền tay 1000 cho kết quả cuối</td></tr>
+  <tr><td><span class="mono">N_PERMUTATION</span></td><td class="n">1000</td><td>permutation null riêng từng chuỗi</td></tr>
+  <tr><td><span class="mono">FDR_ALPHA</span></td><td class="n">0,05</td><td>BH-FDR + tiêu chí PASS của E4</td></tr>
+  <tr><td><span class="mono">T_THRESHOLD</span></td><td class="n">2,5</td><td>Ngưỡng |t| “có ý nghĩa” <i>trước</i> FDR — chỉ dùng để đọc bảng probe (§15), <b>không</b> nằm trong máy suy diễn của Module D</td></tr>
+  <tr><td><span class="mono">RANDOM_SEED</span></td><td class="n">20260821</td><td>seed chung mọi module (train, sampling, permutation, bootstrap, injection)</td></tr>
+</table>
+
+<h3>2.7 Cohort <span class="badge new">đã đổi</span></h3>
+<p>
+  <span class="mono">COHORT_DEFS</span> nay là <b>nguồn sự thật duy nhất</b>:
+  <span class="mono">module_a_store.build_store</span> đọc dict này thay vì hardcode
+  <span class="mono">&gt;= 1000</span> / <span class="mono">&gt;= 300</span> / <span class="mono">sp == "test"</span>,
+  và <span class="mono">store_report.json</span> ghi kèm <span class="mono">cohort_defs</span> đã dùng.
+  Trước đây dict này là <b>code chết</b> — sửa <span class="mono">min_pool</span> trong config không đổi gì,
+  đúng ở cái knob dễ bị tinh chỉnh nhất. Mỗi entry nay đủ 3 khoá
+  (<span class="mono">needs_gold</span>, <span class="mono">min_pool</span>, <span class="mono">gold_split</span>) —
+  <span class="mono">T-unbiased</span> trước đây thiếu <span class="mono">needs_gold</span>.
+  Đã verify: chạy lại Module A cho cohort <b>khớp tuyệt đối</b> 270 / 1.207 / 514 / 10.629.
+</p>
+<table>
+  <tr><th>Cohort</th><th>Định nghĩa (<span class="mono">COHORT_DEFS</span>)</th><th class="n">n hotel [config]</th><th class="n">n hotel [run thật]</th><th>Dùng cho</th></tr>
+  <tr><td><span class="mono">A-dense</span></td><td>có gold ∧ ≥1000 review pool</td><td class="n">276</td><td class="n">270</td><td>drift cấp hotel, granularity tháng</td></tr>
+  <tr><td><span class="mono">B-anchor</span></td><td>có gold ∧ ≥300 review pool</td><td class="n">1.221</td><td class="n">1.207</td><td>drift cấp hotel granularity quý; <b>cohort mặc định của self-train</b></td></tr>
+  <tr><td><span class="mono">T-unbiased</span></td><td><span class="mono">gold_split == "test"</span></td><td class="n">514</td><td class="n">514</td><td><b>cohort đánh giá không thiên vị</b> — extractor chưa từng thấy hotel này (E5)</td></tr>
+  <tr><td><span class="mono">corpus</span></td><td>toàn bộ (danh sách rỗng = không lọc)</td><td class="n">10.631</td><td class="n">10.629</td><td>kết quả chính — nơi tín hiệu mạnh nhất</td></tr>
+</table>
+<p class="sub">
+  Chênh lệch nhỏ (276→270, 1.221→1.207, 10.631→10.629) là do <span class="mono">pool_count</span> trong
+  Module A chỉ đếm các dòng <b>đã qua</b> dedup + cắt cửa sổ, còn số trong <span class="mono">config.py</span>
+  đếm trên pool thô. Con số dùng để báo cáo là con số trong
+  <span class="mono">outputs/store/store_report.json</span>.
+</p>
+
+<h3>2.8 <span class="mono">RunConfig</span> &amp; <span class="mono">ensure_dirs</span></h3>
+<p>
+  <span class="mono">RunConfig</span> là dataclass ghi kèm output để tái lập: <span class="mono">window_start,
+  window_end, use_length_in_strata, min_stratum_n, n_bootstrap, n_permutation, fdr_alpha, seed,
+  provenance_lambda, encoder_version, extractor_ckpt, notes</span> + <span class="mono">to_dict()</span>.
+  <span class="mono">ensure_dirs()</span> tạo sẵn 6 thư mục output (WORK/STORE/EXTRACT/RELIAB/DRIFT/MODEL)
+  và được gọi ở đầu mọi module có ghi file.
+</p>
+<div class="item keep">
+  <div class="hd">Bất biến — mọi run phải ghi <span class="mono">config</span>/<span class="mono">args</span> vào output JSON</div>
+  <p>
+    Module D ghi <span class="mono">vars(args)</span> vào khoá <span class="mono">"config"</span>;
+    B-train ghi <span class="mono">vars(args)</span> + <span class="mono">history</span> vào
+    <span class="mono">training_log.json</span>; C ghi <span class="mono">thresholds</span> +
+    <span class="mono">encoder_version</span> vào <span class="mono">verifier_report.json</span>.
+    Không ghi → không tái lập được → kết quả không dùng được cho paper.
+  </p>
+</div>
+
+<h2 class="pb">§3 · Dữ liệu đầu vào &amp; audit số đo</h2>
+
+<h3>3.1 Bốn nguồn tiên quyết</h3>
+<table>
+  <tr><th>Nguồn</th><th>Đường dẫn</th><th>Quy mô</th><th>Vai trò</th></tr>
+  <tr>
+    <td>Pool chưa nhãn</td><td><span class="mono">data/raw/hotel_booking_unlabeled.jsonl</span></td>
+    <td>1.949.604 dòng · 1,4 GB · 10.631 hotel · 0 dòng JSON lỗi</td>
+    <td>Input duy nhất của Module A</td>
+  </tr>
+  <tr>
+    <td>Gold split</td><td><span class="mono">data/raw/{train,dev,test}.jsonl</span></td>
+    <td>8.816 / 1.895 / 1.890 segment · 23.995 quad · <b>hotel-disjoint</b> (2.381/504/514 hotel, overlap 0)</td>
+    <td>Train/val/test extractor + dựng blocklist + dựng cohort</td>
+  </tr>
+  <tr>
+    <td>Gold meta</td><td><span class="mono">hamos-mabsa/…/reviews_with_dates.jsonl</span> (fallback <span class="mono">hotel_absa_labeled.jsonl</span>)</td>
+    <td>8.796 dòng</td>
+    <td><span class="mono">review_date</span>, <span class="mono">languages</span>, <span class="mono">review_text</span> (cho blocklist hash) — <b>không chứa quad</b></td>
+  </tr>
+  <tr>
+    <td>Gold quad/segment/ảnh</td><td><span class="mono">hamos-mabsa/</span> qua <span class="mono">PRISM_HAMOS_ROOT</span></td>
+    <td>23.995 quad · 12.601 segment · 9.219 ảnh (986 MB)</td>
+    <td>Module B-data (nhãn) + Module C1 (ảnh gold)</td>
+  </tr>
+</table>
+<p>
+  Mỗi dòng gold split: <span class="mono">instance_id · source_review_id · segment_id · text ·
+  review_date · quads[]</span>; mỗi quad = <span class="mono">(aspect_term, taxonomy_code,
+  aspect_category, opinion_term, sentiment)</span> + span.
+</p>
+
+<h3>3.2 Trường của pool: độ phủ &amp; giá trị nghiên cứu</h3>
+<table>
+  <tr><th>Trường</th><th>Kiểu thô</th><th class="n">Độ phủ</th><th>Vai trò</th></tr>
+  <tr><td><span class="mono">hotel_id</span></td><td>str</td><td class="n">100%</td><td>Đơn vị cấp hotel. <b>Gold dùng int → phải ép kiểu khi join</b> (Module A ép về <span class="mono">str</span>)</td></tr>
+  <tr><td><span class="mono">review_date</span></td><td>str VI: <span class="mono">"Ngày đánh giá: ngày D tháng M năm YYYY"</span></td><td class="n">99,99% (184 null)</td><td><b>Trục thời gian chính</b> — không có định dạng ISO trong pool, phải parse regex</td></tr>
+  <tr><td><span class="mono">review_score</span></td><td>str <span class="mono">"Đạt điểm 9,0"</span> (dấu phẩy thập phân)</td><td class="n">100%</td><td>Weak signal + biến detrend. Lệch dương nặng: điểm 10 = 44,9%; TB tháng chỉ dao động 8,47–8,87</td></tr>
+  <tr><td><span class="mono">review_positive</span></td><td>str | null</td><td class="n">57,6%</td><td>Text nguồn <b>+ nhãn polarity ngầm</b> φ=POS</td></tr>
+  <tr><td><span class="mono">review_negative</span></td><td>str | null</td><td class="n">36,2%</td><td>Text nguồn + φ=NEG. Nguồn quad negative chính</td></tr>
+  <tr><td><span class="mono">country</span></td><td>str</td><td class="n">99,7%</td><td><b>Confounder quan trọng nhất</b>: VN 29,9% · Pháp 6,8% · Úc 6,6% · Đức 6,5% · Anh 6,4%</td></tr>
+  <tr><td><span class="mono">state</span></td><td>str</td><td class="n">99,7%</td><td>Loại khách — confounder chủ lực thứ hai</td></tr>
+  <tr><td><span class="mono">room</span></td><td>str</td><td class="n">99,7%</td><td>Cho phép kiểm soát “đổi mix sản phẩm” thay vì “đổi chất lượng”</td></tr>
+  <tr><td><span class="mono">stars_rating</span></td><td>float | null</td><td class="n">89,9%</td><td>Hạng sao hotel — biến phân tầng</td></tr>
+  <tr><td><span class="mono">review_photo</span></td><td>dict <span class="mono">{url: caption}</span></td><td class="n"><b>6,24%</b> (121.584)</td><td>Nhánh multimodal — nguồn của Module C2</td></tr>
+  <tr><td><span class="mono">date</span></td><td>str <span class="mono">"1 đêm · Tháng 2/2025"</span></td><td class="n">99,7%</td><td>Ngày <b>lưu trú</b> (khác ngày review) — cho phép tính độ trễ review</td></tr>
+  <tr><td><span class="mono">name</span></td><td>str</td><td class="n">99,7%</td><td>Tên reviewer. <b>Không có <span class="mono">reviewer_id</span></b> → không loại được reviewer lặp</td></tr>
+  <tr><td><span class="mono">time_crawl</span></td><td>str</td><td class="n">100%</td><td>Toàn bộ ~2025-03 → xác nhận <b>crawl một lần</b></td></tr>
+</table>
+<p>
+  <b>Không tồn tại trong dữ liệu (phải khai báo với reviewer):</b> <span class="mono">reviewer_id</span>,
+  địa lý hotel dạng cấu trúc, giá phòng, thông tin renovation/đổi chủ, review response của hotel,
+  helpfulness vote, dữ liệu nền tảng khác ngoài Booking.com.
+</p>
+
+<h3>3.3 Bốn confounder trôi theo thời gian (lý do tồn tại của Module D)</h3>
+<table>
+  <tr><th>Thứ trôi</th><th>Biên độ đo được</th><th>Phá hỏng đại lượng nào</th><th>π tự khử?</th></tr>
+  <tr><td>Số hotel/tháng</td><td>549 (2022-02) → <b>8.535</b> (2025-02) — 15,6×</td><td>count tuyệt đối</td><td>✓ (log-ratio bất biến với tổng khối lượng)</td></tr>
+  <tr><td>% review có text</td><td>42,1% → <b>63,4%</b></td><td>count tuyệt đối</td><td>✓</td></tr>
+  <tr><td>Độ dài review TB</td><td>27,5 → <b>40,8 từ</b></td><td>count <b>và recall của extractor</b></td><td>✓ phần recall chung; ⚠ phần recall lệch theo độ dài cần D-a</td></tr>
+  <tr><td>Reviewer Việt Nam</td><td><b>89,7% → 16,1%</b> (2022-03 → 2025-01)</td><td><b>mọi tỷ lệ chưa hiệu chỉnh</b></td><td>✗ <b>bắt buộc hiệu chỉnh tường minh (D-b)</b></td></tr>
+</table>
+<p>
+  Vì vậy: <b>không dùng count</b>, <b>không dùng điểm trung bình</b> (score gần phẳng 8,47–8,87 và lệch
+  dương nặng — không đủ độ phân giải), mà dùng <b>share + standardization</b>.
+</p>
+
+<h3>3.4 Gold: cấu trúc &amp; giới hạn</h3>
+<table>
+  <tr><th>Chiều</th><th>Số đo</th><th>Hệ quả cho pipeline</th></tr>
+  <tr><td>Quy mô</td><td>23.995 quad · 12.601 segment · 8.796 review · 3.399 hotel · 38 tháng</td><td>Cơ sở train extractor</td></tr>
+  <tr><td>Sentiment</td><td>positive <b>79,4%</b> · negative 15,4% · neutral 5,2% (1.248)</td><td>Mất cân bằng nặng; neutral là lớp yếu nhất. 15,4% chính là mốc <span class="mono">gold_neg_rate</span> của guardrail self-train</td></tr>
+  <tr><td>Ngôn ngữ</td><td>en 7.473 · vi 1.032 · other 205 · đa ngữ 86 → <b>80,5% en · 16,2% vi</b></td><td><b>Nghịch đảo so với pool</b> (~30% có dấu tiếng Việt) → chọn mT5, cân nhắc oversample vi</td></tr>
+  <tr><td>Quad/review · quad/segment</td><td>mean 2,73 (max 36) · mean 1,90 (max 23)</td><td>Cơ sở đặt <span class="mono">--max-tgt 192</span></td></tr>
+  <tr><td>Độ dài segment</td><td>mean 13 từ · max 147</td><td>Cơ sở đặt <span class="mono">--max-src 160</span></td></tr>
+  <tr><td>Implicit</td><td>aspect 3,3% (782) · opinion 1,2% (283)</td><td><b>Không làm claim về implicit</b> (chuẩn ACOS ~30%)</td></tr>
+  <tr><td>Phủ văn bản</td><td>Gold chỉ chú thích <b>26%</b> văn bản gốc; phủ ô positive 42% nhưng negative chỉ <b>25%</b></td><td><b>Nguồn của D-a</b>: recall lệch theo cực tính</td></tr>
+  <tr><td>Đa modal</td><td>100% quad có <span class="mono">primary_image_id</span>; 9.175 ảnh là primary</td><td>Nhưng grounding chỉ ở <b>mức review</b> — xem §12.2</td></tr>
+</table>
+
+<h3>3.5 Overlap gold ↔ pool: vì sao blocklist là bắt buộc</h3>
+<ul>
+  <li><b>3.399/3.399 (100%)</b> hotel gold có mặt trong pool.</li>
+  <li><b>1.249.424</b> review pool (64,1%) thuộc hotel có gold → đây là universe làm việc của cohort A/B.</li>
+  <li>Đã xác nhận <b>gold ⊂ pool</b> bằng ví dụ cụ thể: <span class="mono">H3977209_R00003</span> (2022-09-05).</li>
+</ul>
+<div class="item bad">
+  <div class="hd">R2 — leakage gold vào pool <span class="badge p1">P1</span></div>
+  <p>
+    Nếu không chặn: self-training sẽ <b>nuốt cả test set</b> → mọi F1 báo cáo trở nên vô hiệu và không
+    phát hiện được bằng cách đọc kết quả. Đây là lý do Module A có bước <b>A4 blocklist [BLOCKING]</b>
+    với 3 khoá (§5.2), và lý do <span class="mono">module_b_infer</span> bỏ qua vô điều kiện mọi dòng
+    <span class="mono">in_gold=true</span>.
+  </p>
+</div>
+
+<h3>3.6 Granularity thời gian cho phép</h3>
+<table>
+  <tr><th>Cấp phân tích</th><th>Granularity</th><th>Bằng chứng số</th></tr>
+  <tr><td>Corpus</td><td><b>Tháng</b></td><td>~60,5k quad/tháng ước tính — dư sức cho cả subcategory hiếm</td></tr>
+  <tr><td>Cohort (≥50 hotel)</td><td><b>Tháng</b></td><td>Luôn đủ dày</td></tr>
+  <tr><td>Hotel ≥1000 review (323 hotel)</td><td>Tháng</td><td>~26 review/tháng → FAC_ROOM ~7,5 quad/tháng</td></tr>
+  <tr><td>Hotel 300–1000 review (1.370)</td><td><b>Quý</b></td><td>~8 review/tháng → FAC_ROOM ~2,3 quad/tháng, quá thưa cho tháng</td></tr>
+  <tr><td>Hotel &lt;300 review (8.938)</td><td>Không phân tích riêng</td><td>median 66 review / 38 tháng = 1,7 review/tháng</td></tr>
+</table>
+<p><b>Không dùng granularity tuần</b> ở bất kỳ cấp nào: chu kỳ ngày-trong-tuần và kỳ nghỉ lấn át tín hiệu.</p>
+
+<h2 class="pb">§4 · Tiện ích dùng chung — <span class="mono">src/prism/utils.py</span></h2>
+<p class="sub">Mọi module import <span class="mono">from . import utils as U</span>. Không có phụ thuộc ngoài stdlib.</p>
+
+<h3>4.1 I/O &amp; logging</h3>
+<table>
+  <tr><th>Hàm</th><th>Hợp đồng</th></tr>
+  <tr><td><span class="mono">get_logger(name)</span></td><td>Logger stderr một handler, format <span class="mono">[HH:MM:SS] name LEVEL msg</span>, level INFO. Idempotent (không nhân handler khi gọi lại)</td></tr>
+  <tr><td><span class="mono">read_jsonl(path)</span></td><td><b>Iterator</b> (không nạp cả file vào RAM). Tự mở <span class="mono">gzip</span> nếu đuôi <span class="mono">.gz</span>; bỏ dòng trống</td></tr>
+  <tr><td><span class="mono">write_jsonl(path, rows, gzip_out=False)</span></td><td>Ghi từng dòng, <span class="mono">ensure_ascii=False</span>, tự tạo thư mục cha, tự gzip nếu đuôi <span class="mono">.gz</span>. Trả về số dòng đã ghi</td></tr>
+  <tr><td><span class="mono">write_json(path, obj)</span></td><td>JSON indent 2, UTF-8 giữ nguyên dấu</td></tr>
+</table>
+
+<h3>4.2 Chuẩn hoá văn bản &amp; định danh</h3>
+<table>
+  <tr><th>Hàm</th><th>Hợp đồng</th><th>Dùng ở đâu</th></tr>
+  <tr><td><span class="mono">nfc(s)</span></td><td>NFC normalize + strip; <span class="mono">None</span> → <span class="mono">""</span></td><td>Chuẩn hoá text pool/gold khi đọc</td></tr>
+  <tr><td><span class="mono">norm_text(s)</span></td><td>Chuẩn hoá <b>mạnh</b> để so khớp: NFKC + hạ chữ + bỏ dấu câu + gộp khoảng trắng</td><td>Blocklist hash, khoá dedup, exact-match của B-eval</td></tr>
+  <tr><td><span class="mono">text_hash(s)</span></td><td>MD5 của <span class="mono">norm_text(s)</span></td><td>Dedup A3, blocklist khoá text</td></tr>
+  <tr><td><span class="mono">quad_uid(q)</span></td><td><span class="mono">f"{review_uid}_{phi}_{taxonomy_code}_{text_hash(opinion_term)[:6]}"</span></td><td><b>Khoá join giữa mẫu audit người và Module C bridge</b></td></tr>
+</table>
+<div class="item keep">
+  <div class="hd">Bất biến — <span class="mono">quad_uid</span> phải dùng chung một hàm</div>
+  <p>
+    <span class="mono">make_audit_samples</span> sinh khoá và <span class="mono">module_c_reliability.fit_bridge</span>
+    dựng lại khoá để đối chiếu. Hai bên tự dựng khoá riêng thì <b>không khớp cặp nào</b> → Spearman
+    audit không tính được → go/no-go của Module C tưởng là NO-GO. Bug này đã từng xảy ra và được sửa
+    (changelog 2026-08-22); đừng inline lại công thức khoá ở nơi khác.
+  </p>
+</div>
+
+<h3>4.3 Parser dữ liệu thô (Việt hoá)</h3>
+<table>
+  <tr><th>Hàm</th><th>Regex / logic</th><th>Trả về</th></tr>
+  <tr>
+    <td><span class="mono">parse_review_date(raw)</span></td>
+    <td>Ưu tiên <span class="mono">ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})</span>;
+        fallback ISO <span class="mono">(\d{4})-(\d{2})-(\d{2})</span>;
+        fallback <span class="mono">(\d{1,2})/(\d{1,2})/(\d{4})</span>. Kiểm tra 1≤tháng≤12, 1≤ngày≤31</td>
+    <td><span class="mono">(iso_date, period="YYYY-MM")</span> hoặc <span class="mono">None</span>. [đo] 99,99% pool khớp mẫu VI; 184 dòng null</td>
+  </tr>
+  <tr>
+    <td><span class="mono">parse_score(raw)</span></td>
+    <td>Bỏ tiền tố <span class="mono">"Đạt điểm"</span>, khớp <span class="mono">(\d{1,2})([.,](\d))?</span>, ghép thành float; chấp nhận int/float truyền thẳng</td>
+    <td>float ∈ [0,10] hoặc <span class="mono">None</span> (loại giá trị ngoài khoảng)</td>
+  </tr>
+  <tr><td><span class="mono">parse_nights(raw)</span></td><td><span class="mono">(\d+)\s*đêm</span></td><td>int hoặc <span class="mono">None</span></td></tr>
+</table>
+
+<h3>4.4 Strata &amp; trục thời gian</h3>
+<table>
+  <tr><th>Hàm</th><th>Hợp đồng</th></tr>
+  <tr><td><span class="mono">country_bloc(country)</span></td><td><span class="mono">"việt nam"</span>→VN; ∈WEST_COUNTRIES→WEST; ∈ASIA_COUNTRIES→ASIA; còn lại (kể cả <span class="mono">None</span>)→OTH</td></tr>
+  <tr><td><span class="mono">traveller_type(state)</span></td><td>Giữ nguyên nếu ∈ <span class="mono">TRAVELLER_TYPES</span>, ngược lại <span class="mono">"NA"</span></td></tr>
+  <tr><td><span class="mono">length_bin(n_words)</span></td><td>L0 / L1 / L2 theo <span class="mono">LENGTH_BINS</span></td></tr>
+  <tr><td><span class="mono">make_stratum(country, state, n_words, use_length=USE_LENGTH_IN_STRATA)</span></td><td>Tuple <span class="mono">(bloc, traveller)</span>, cộng thêm <span class="mono">length_bin</span> nếu <span class="mono">use_length</span></td></tr>
+  <tr><td><span class="mono">in_window(period)</span> · <span class="mono">periods_in_window()</span></td><td>So sánh chuỗi <span class="mono">"YYYY-MM"</span> (đúng thứ tự từ điển = đúng thứ tự thời gian); sinh danh sách 36 kỳ</td></tr>
+</table>
+
+<h3>4.5 Máy thống kê</h3>
+<div class="fx">
+  <b>clr(shares, eps=1e-6)</b> — centered log-ratio: clr(p)<sub>a</sub> = log( p<sub>a</sub> / (∏<sub>a′</sub> p<sub>a′</sub>)<sup>1/K</sup> ), sau khi kẹp p<sub>a</sub> ≥ eps.
+  <span class="why"><b>Bắt buộc:</b> các share cộng lại = 1, nên một aspect tăng thì các aspect khác <b>buộc phải</b> giảm → hồi quy trực tiếp trên share sinh tương quan âm giả và vi phạm ràng buộc simplex. CLR đưa từ simplex về không gian thực (tổng các thành phần clr = 0 — có unit test kiểm chứng) và hiệu log-ratio <b>bất biến với tổng khối lượng</b> — đúng thứ cần khi hotel/tháng tăng 15,6×.</span>
+</div>
+<div class="fx">
+  <b>benjamini_hochberg(pvals, alpha)</b> — trả q-value <b>giữ đúng thứ tự input</b>: quét từ p lớn nhất xuống, q<sub>(i)</sub> = min( q<sub>(i+1)</sub>, p<sub>(i)</sub>·n/i ), kẹp ≤ 1.
+  <span class="why">Cài đặt “step-up có monotone enforcement”. Test kiểm chứng ví dụ chuẩn [0,01…0,04; 0,9] → 4 giá trị đầu đều đúng 0,05.</span>
+</div>
+<div class="fx">
+  <b>welch_t(a, b)</b> = (mean a − mean b) / √(var a/n<sub>a</sub> + var b/n<sub>b</sub>), với var là ước lượng không chệch (chia n−1).
+  <span class="why">Trả <b>0,0</b> khi n&lt;2 ở một phía hoặc mẫu số = 0 (hai nửa phương sai 0) — guard này khiến changepoint không bao giờ chia cho 0, nhưng cũng có nghĩa chuỗi hằng số hoàn toàn cho t=0.</span>
+</div>
+
+<h2 class="pb">§5 · Module A — Temporal Quad Store <span class="badge cpu">CPU</span></h2>
+<p class="sub">
+  <span class="mono">src/prism/module_a_store.py</span> · chạy: <span class="mono">python -m prism.module_a_store</span> ·
+  không cần torch · ~10 phút · <b>đã chạy thật 2026-08-21</b>
+</p>
+<p class="lead">
+  Nhiệm vụ: biến 1.949.604 dòng pool thô thành corpus có trục thời gian sạch, <b>chống leakage gold</b>,
+  và gắn sẵn mọi trường mà Module B/C/D cần (period · stratum · cohort · has_photo · in_gold). Đây là
+  step <b>chặn mọi thứ</b>: sai ở đây thì mọi kết quả phía sau vô hiệu.
+</p>
+
+<h3>5.1 Input / Output</h3>
+<table>
+  <tr><th>Chiều</th><th>File</th><th>Ghi chú</th></tr>
+  <tr><td rowspan="3"><b>IN</b></td><td><span class="mono">data/raw/hotel_booking_unlabeled.jsonl</span></td><td>pool thô</td></tr>
+  <tr><td><span class="mono">data/raw/{train,dev,test}.jsonl</span></td><td>chỉ lấy <span class="mono">source_review_id</span> → map review → split</td></tr>
+  <tr><td><span class="mono">GOLD_META</span></td><td>lấy <span class="mono">hotel_id</span>, <span class="mono">review_date</span>, <span class="mono">review_text</span> để dựng blocklist</td></tr>
+  <tr><td rowspan="3"><b>OUT</b></td><td><span class="mono">outputs/store/reviews.jsonl.gz</span></td><td>180 MB · 1.921.661 dòng · schema §5.4</td></tr>
+  <tr><td><span class="mono">outputs/store/hotel_cohorts.json</span></td><td><span class="mono">{cohort: [hotel_id…]}</span>; <span class="mono">corpus</span> là danh sách <b>rỗng</b> = không lọc</td></tr>
+  <tr><td><span class="mono">outputs/store/store_report.json</span></td><td>stats + cohort_sizes + window + gold_leak_flagged</td></tr>
+</table>
+
+<h3>5.2 A4 — Gold blocklist [BLOCKING]: ba khoá</h3>
+<p><span class="mono">build_gold_blocklist()</span> trả về 3 cấu trúc:</p>
+<table>
+  <tr><th>#</th><th>Khoá</th><th>Cấu trúc</th><th>Chặn kiểu gì</th></tr>
+  <tr><td>1</td><td><span class="mono">(hotel_id, iso_date)</span></td><td><span class="mono">set[str]</span> dạng <span class="mono">"hid|YYYY-MM-DD"</span></td><td>Chặn <b>thô</b> — an toàn nhất, cố tình over-flag</td></tr>
+  <tr><td>2</td><td>hash 120 ký tự đầu của <span class="mono">norm_text(review_text)</span></td><td><span class="mono">dict[hotel_id, set[str]]</span></td><td>Chặn khớp <b>nội dung</b> kể cả khi ngày lệch</td></tr>
+  <tr><td>3</td><td><span class="mono">hotel_id → gold_split</span></td><td><span class="mono">dict[str,str]</span></td><td>Không phải để chặn, mà để gắn <span class="mono">gold_split</span> → dựng cohort <span class="mono">T-unbiased</span></td></tr>
+</table>
+<p>
+  <span class="mono">is_gold_leak(hid, iso, text_pos, text_neg, keys_date, keys_text)</span> —
+  <b>early-exit</b> nếu <span class="mono">hid</span> không phải hotel gold (đa số dòng thoát ở đây, nên
+  hàm rẻ); sau đó thử khoá ngày, rồi thử khoá text trên <b>ba biến thể</b>:
+  <span class="mono">text_pos</span>, <span class="mono">text_neg</span>, và
+  <span class="mono">f"{text_pos} {text_neg}"</span> — vì gold có thể được nối từ cả hai ô.
+</p>
+<div class="item keep">
+  <div class="hd">Over-flag là <b>thiết kế</b>, không phải bug</div>
+  <p>
+    Run thật: <span class="mono">flag_gold_leak = 18.475</span> &gt; 8.796 review gold — vì khoá
+    <span class="mono">(hotel, date)</span> cố tình thô (một hotel có thể có nhiều review cùng ngày).
+    Đây là hướng an toàn: thà loại nhầm vài nghìn dòng khỏi training <b>còn hơn để một dòng test lọt vào</b>.
+    <b>Nếu <span class="mono">flag_gold_leak == 0</span> → blocklist hỏng, phải dừng lại</b> (đã xác nhận
+    gold ⊂ pool nên con số 0 là bất khả thi).
+  </p>
+</div>
+<div class="item warn">
+  <div class="hd">🔴 Khoá <span class="mono">(hotel_id, review_date)</span> hiện KHÔNG hoạt động <span class="badge new">đã đổi</span></div>
+  <p>
+    <span class="mono">hamos-mabsa/metadata/reviews.jsonl</span> <b>không có trường</b>
+    <span class="mono">review_date</span>, và <span class="mono">metadata/reviews_with_dates.jsonl</span>
+    (đường ưu tiên của <span class="mono">_hamos_file</span>) không tồn tại trong bản checkout hiện tại.
+    Đo trực tiếp: <span class="mono">blocklist: 0 khoá (hotel,date) · 3.399 hotel gold</span> — tức
+    <b>chỉ còn khoá hash text hoạt động</b>, không phải 2 lớp như mô tả ở trên.
+  </p>
+  <p>
+    Hệ quả đo được: chạy lại Module A trên môi trường hiện tại cho
+    <b><span class="mono">flag_gold_leak</span> = 1.466</b> thay vì 18.475 — <b>~17.000 dòng pool từng bị
+    chặn nay lọt vào tập được train / self-train / infer</b>. Cohort không đổi
+    (270/1.207/514/10.629) nên không có dấu hiệu nào khác.
+  </p>
+  <p>
+    Module A nay log <span class="mono">ERROR</span> và ghi <span class="mono">blocklist_date_keys</span> +
+    <span class="mono">blocklist_date_key_active</span> vào <span class="mono">store_report.json</span>.
+    <b>Kiểm <span class="mono">blocklist_date_key_active</span> trước mỗi run.</b> Muốn bật lại lớp này:
+    bổ sung <span class="mono">metadata/reviews_with_dates.jsonl</span> vào repo
+    <span class="mono">hamos-mabsa</span> rồi chạy lại Module A và mọi bước sau.
+  </p>
+</div>
+
+<h3>5.3 Tám bước xử lý (theo đúng thứ tự trong <span class="mono">build_store()</span>)</h3>
+<table>
+  <tr><th>#</th><th>Bước</th><th>Logic cài đặt</th><th>Kết quả run thật</th></tr>
+  <tr><td>A1</td><td>Parse ngày</td><td><span class="mono">U.parse_review_date</span>; không parse được → <b>loại dòng</b> (<span class="mono">drop_no_date</span>)</td><td class="nowrap">184 dòng bị loại</td></tr>
+  <tr><td>A2</td><td>Cắt cửa sổ</td><td><span class="mono">U.in_window(period)</span> — ngoài 2022-03…2025-02 → loại</td><td class="nowrap">12.602 dòng</td></tr>
+  <tr><td>A3</td><td>Dedup</td><td>Khoá <span class="mono">text_hash("hid|name|iso|text_pos|text_neg")</span> lưu trong set trong RAM</td><td class="nowrap">15.157 dòng (0,78%)</td></tr>
+  <tr><td>A4</td><td><b>Gold blocklist</b></td><td>Không loại dòng — <b>gắn cờ</b> <span class="mono">in_gold=true</span>. Việc bỏ qua thực hiện ở downstream (infer/selftrain/photos/audit)</td><td class="nowrap">18.475 dòng bị gắn cờ</td></tr>
+  <tr><td>A5</td><td>Ép kiểu <span class="mono">hotel_id</span></td><td><span class="mono">str(d.get("hotel_id") or "")</span> ở pool và <span class="mono">str(row["hotel_id"])</span> ở gold — khớp kiểu str ↔ int</td><td>—</td></tr>
+  <tr><td>A6</td><td>Cờ text-bearing</td><td>Tách <span class="mono">text_pos</span>/<span class="mono">text_neg</span> riêng (NFC), <span class="mono">has_text = bool(pos or neg)</span>, <span class="mono">n_words</span> = số từ của hai ô ghép lại</td><td class="nowrap">1.141.532 có text</td></tr>
+  <tr><td>A7</td><td>Language ID</td><td><span class="badge todo">CHƯA CÀI</span> — docstring nêu là tùy chọn (cần <span class="mono">fasttext</span>); <b>output không có trường <span class="mono">lang</span></b></td><td>—</td></tr>
+  <tr><td>A8</td><td>Stratum + cohort</td><td><span class="mono">U.make_stratum(country, state, n_words)</span> ghi thành list; cohort tính <b>sau khi ghi xong</b> từ <span class="mono">pool_count</span> + <span class="mono">hotel_split</span></td><td class="nowrap">4 cohort, xem §2.7</td></tr>
+</table>
+<div class="item warn">
+  <div class="hd">Ba điểm lệch giữa code và tài liệu phương pháp <span class="badge p2">LỆCH</span></div>
+  <ul>
+    <li><b>Không lọc dòng không có text.</b> Store giữ cả 780.129 dòng không text (chỉ score+title), chỉ gắn cờ <span class="mono">has_text</span>. Việc lọc xảy ra tự nhiên ở <span class="mono">module_b_infer.units()</span> (chỉ sinh đơn vị khi ô text tồn tại). Nên <span class="mono">n_written</span> = 1.921.661 <b>không phải</b> số review có text.</li>
+    <li><b>Không có trường <span class="mono">lang</span></b> (A7 chưa cài) và <b>không có <span class="mono">image_ids</span></b> — thay bằng <span class="mono">photo_urls</span> (list URL). <span class="mono">method_table_q1.md §A.3</span> mô tả schema có hai trường này.</li>
+    <li><b><span class="mono">hotel_id</span> giữ kiểu <span class="mono">str</span></b> trong output (tài liệu ghi “đã ép kiểu int”). Mọi so sánh downstream cũng dùng str nên nhất quán.</li>
+  </ul>
+</div>
+
+<h3>5.4 Schema <span class="mono">outputs/store/reviews.jsonl.gz</span> (19 trường)</h3>
+<table>
+  <tr><th>Trường</th><th>Kiểu</th><th>Nguồn / công thức</th><th>Ai dùng</th></tr>
+  <tr><td><span class="mono">review_uid</span></td><td>str</td><td><span class="mono">f"{hotel_id}_{iso không gạch}_{chỉ số dòng đã đọc:08d}"</span> — ổn định theo thứ tự file, <b>không</b> ổn định nếu pool đổi</td><td>khoá join xuyên pipeline; tên file ảnh pool</td></tr>
+  <tr><td><span class="mono">hotel_id</span></td><td>str</td><td>ép str</td><td>cohort filter (B-infer, D)</td></tr>
+  <tr><td><span class="mono">iso_date</span></td><td>str</td><td><span class="mono">YYYY-MM-DD</span></td><td>blocklist, audit</td></tr>
+  <tr><td><span class="mono">period</span></td><td>str</td><td><span class="mono">YYYY-MM</span></td><td><b>trục thời gian của Module D</b></td></tr>
+  <tr><td><span class="mono">text_pos</span> / <span class="mono">text_neg</span></td><td>str | null</td><td>NFC của <span class="mono">review_positive</span>/<span class="mono">review_negative</span></td><td>hai đơn vị suy luận φ=POS / φ=NEG</td></tr>
+  <tr><td><span class="mono">score</span></td><td>float | null</td><td><span class="mono">U.parse_score</span></td><td>IPW propensity (C3); <b>chỉ để validate, không bao giờ lọc</b></td></tr>
+  <tr><td><span class="mono">stars_rating</span></td><td>float | null</td><td>passthrough</td><td>phân tầng bổ sung (chưa dùng)</td></tr>
+  <tr><td><span class="mono">stratum</span></td><td>list[str]</td><td><span class="mono">[country_bloc, traveller]</span> (2 phần tử vì <span class="mono">USE_LENGTH_IN_STRATA=False</span>)</td><td><b>direct standardization của Module D</b></td></tr>
+  <tr><td><span class="mono">country_bloc</span> · <span class="mono">traveller</span></td><td>str</td><td>bản phẳng của <span class="mono">stratum</span> (tiện query)</td><td>phân tích phụ</td></tr>
+  <tr><td><span class="mono">n_words</span></td><td>int</td><td>số từ của <span class="mono">"{pos} {neg}"</span></td><td>length_bin, feature bridge, IPW</td></tr>
+  <tr><td><span class="mono">nights</span> · <span class="mono">room</span></td><td>int|null · str|null</td><td><span class="mono">parse_nights(d["date"])</span> · NFC</td><td>kiểm soát “đổi mix sản phẩm” (chưa dùng)</td></tr>
+  <tr><td><span class="mono">has_text</span></td><td>bool</td><td><span class="mono">bool(text_pos or text_neg)</span></td><td>mẫu D0</td></tr>
+  <tr><td><span class="mono">has_photo</span></td><td>bool</td><td><span class="mono">bool(d["review_photo"])</span></td><td>C2/C3 (propensity), tải ảnh</td></tr>
+  <tr><td><span class="mono">photo_urls</span></td><td>list[str]</td><td><span class="mono">list(d["review_photo"].keys())</span></td><td><span class="mono">download_pool_photos.py</span> lấy URL <b>đầu tiên</b></td></tr>
+  <tr><td><span class="mono">in_gold</span></td><td>bool</td><td>cờ blocklist</td><td><b>BLOCKLIST — không bao giờ train/self-train/infer trên dòng này</b></td></tr>
+  <tr><td><span class="mono">gold_split</span></td><td>str | null</td><td><span class="mono">train/dev/test</span> ở <b>cấp hotel</b></td><td>dựng cohort <span class="mono">T-unbiased</span></td></tr>
+</table>
+
+<h3>5.5 Kết quả run thật (<span class="mono">store_report.json</span>, 2026-08-21)</h3>
+<div class="two">
+<table>
+  <tr><th>stats</th><th class="n">Giá trị</th></tr>
+  <tr><td><span class="mono">read</span></td><td class="n">1.949.604</td></tr>
+  <tr><td><span class="mono">drop_no_date</span></td><td class="n">184</td></tr>
+  <tr><td><span class="mono">drop_window</span></td><td class="n">12.602</td></tr>
+  <tr><td><span class="mono">drop_dup</span></td><td class="n">15.157</td></tr>
+  <tr><td><span class="mono">has_text</span></td><td class="n">1.141.532</td></tr>
+  <tr><td><span class="mono">no_text</span></td><td class="n">780.129</td></tr>
+  <tr><td><span class="mono">flag_gold_leak</span></td><td class="n"><b>18.475</b><br><span class="c">(1.466 trên môi trường hiện tại — khoá date rỗng, xem §5.2)</span></td></tr>
+</table>
+<table>
+  <tr><th>Tổng hợp</th><th class="n">Giá trị</th></tr>
+  <tr><td><span class="mono">n_written</span></td><td class="n"><b>1.921.661</b></td></tr>
+  <tr><td><span class="mono">n_hotels</span></td><td class="n">10.629</td></tr>
+  <tr><td>cohort <span class="mono">A-dense</span></td><td class="n">270</td></tr>
+  <tr><td>cohort <span class="mono">B-anchor</span></td><td class="n">1.207</td></tr>
+  <tr><td>cohort <span class="mono">T-unbiased</span></td><td class="n">514</td></tr>
+  <tr><td>cohort <span class="mono">corpus</span></td><td class="n">10.629</td></tr>
+  <tr><td><span class="mono">window</span></td><td class="n">2022-03 → 2025-02</td></tr>
+</table>
+</div>
+<p class="sub">Kiểm tra: 1.949.604 − 184 − 12.602 − 15.157 = 1.921.661 ✓ (dòng bị gắn cờ gold vẫn được ghi).</p>
+
+<h2 class="pb">§6 · Module B-data — Text-to-text <span class="badge cpu">CPU</span></h2>
+<p class="sub">
+  <span class="mono">src/prism/module_b_data.py</span> · <span class="mono">python -m prism.module_b_data</span> ·
+  ~10 s · không cần torch
+</p>
+
+<h3>6.1 Ngữ pháp target tuyến tính hoá</h3>
+<pre>TASK_PREFIX = "extract quads: "
+QUAD_OPEN   = "&lt;quad&gt;"     QUAD_CLOSE = "&lt;/quad&gt;"     SEP = " | "     NULL = "NULL"
+
+input : "extract quads: Nhân viên nhiệt tình"
+target: "&lt;quad&gt; Nhân viên | SER_ATTITUDE | nhiệt tình | positive &lt;/quad&gt;"
+
+nhiều quad  → nối bằng dấu cách:
+target: "&lt;quad&gt; staff | SER_ATTITUDE | friendly | positive &lt;/quad&gt; &lt;quad&gt; pool | AM_POOL | dirty | negative &lt;/quad&gt;"
+
+aspect/opinion implicit → token NULL:
+target: "&lt;quad&gt; NULL | AM_WIFI | NULL | negative &lt;/quad&gt;"</pre>
+<p>
+  Thứ tự 4 trường trong một quad: <b>aspect_term | taxonomy_code | opinion_term | sentiment</b>.
+  <span class="mono">aspect_category</span> <b>không</b> nằm trong target — nó được suy ra từ
+  <span class="mono">CODE2CAT[code]</span> lúc parse (giảm độ dài target và loại một nguồn mâu thuẫn).
+</p>
+
+<div class="item warn">
+  <div class="hd">Term chứa ký tự phân cách phải được <b>escape</b> <span class="badge new">đã đổi</span></div>
+  <p>
+    <span class="mono">linearize</span> nay đưa term qua <span class="mono">esc_term()</span>:
+    <span class="mono">|</span> → <span class="mono">&amp;#124;</span>,
+    <span class="mono">&lt;quad&gt;</span>/<span class="mono">&lt;/quad&gt;</span> → dạng entity;
+    <span class="mono">parse_linearized</span> gọi <span class="mono">unesc_term()</span> để khôi phục.
+  </p>
+  <p>
+    Vì sao bắt buộc: <span class="mono">aspect_term = "giá | chất lượng"</span> sinh ra <b>5 trường</b>, và bản cũ
+    yêu cầu đúng 4 nên <b>bỏ cả quad im lặng</b>. Hai đường thiệt hại: lúc train, target vẫn chứa quad đó nên
+    model được dạy sinh định dạng mà chính parser sẽ bỏ; lúc infer, mọi quad có <span class="mono">|</span> trong
+    term bị mất → <b>recall lệch theo <i>loại term</i></b> (rất thường trong review đa ngữ: &ldquo;giá | chất lượng&rdquo;,
+    &ldquo;wifi|tv&rdquo;), không lệch theo aspect nên <b>không xuất hiện ở bảng <span class="mono">by_category</span> nào</b>.
+    <span class="mono">roundtrip_mismatch</span> có đếm, nhưng đó là bằng chứng cho gold hôm nay, không phải bảo vệ cho pool.
+  </p>
+</div>
+
+<h3>6.2 <span class="mono">parse_linearized(s)</span> — nghịch đảo, dùng cả lúc infer</h3>
+<p>Thuật toán <span class="badge new">đã đổi</span>: <span class="mono">split(QUAD_OPEN)[1:]</span> → cắt tại
+<span class="mono">QUAD_CLOSE</span> → tách <span class="mono">|</span> → <b>neo vào hai trường xác định được</b>:
+<span class="mono">sentiment</span> là trường CUỐI, <span class="mono">taxonomy_code</span> là trường <b>duy nhất</b>
+thuộc <span class="mono">CODE2CAT</span>. Phần trước code = aspect, phần giữa code và sentiment = opinion, rồi
+<span class="mono">unesc_term()</span>. Nhờ vậy model tự sinh <span class="mono">|</span> thô vẫn parse được thay vì
+mất cả quad. Bỏ qua (im lặng) quad khi:</p>
+<ul>
+  <li>&lt; 4 trường (model sinh sai định dạng);</li>
+  <li>không có <b>đúng một</b> trường thuộc <span class="mono">CODE2CAT</span> (không xác định được vị trí code);</li>
+  <li>vị trí aspect hoặc opinion rỗng hẳn;</li>
+  <li><span class="mono">code ∉ CODE2CAT</span> → <b>taxonomy hard-filter ngay tại parse</b>;</li>
+  <li><span class="mono">sentiment ∉ {positive, neutral, negative}</span>.</li>
+</ul>
+<p>Trả về dict 7 trường: <span class="mono">aspect_term · taxonomy_code · aspect_category · opinion_term · sentiment · aspect_implicit · opinion_implicit</span> (<span class="mono">*_implicit</span> = trường đó bằng <span class="mono">NULL</span>).</p>
+<div class="item keep">
+  <div class="hd">Hard-filter tách khỏi score mềm</div>
+  <p>
+    Taxonomy hợp lệ là <b>ràng buộc cứng</b> (quad có code lạ không tồn tại về mặt khái niệm) nên nó nằm
+    ở parse, và lặp lại ở <span class="mono">apply_weights</span> dưới dạng
+    <span class="mono">1[tax hợp lệ]</span>. Ngược lại provenance/reliability là <b>score mềm</b>, không
+    bao giờ được biến thành bộ lọc.
+  </p>
+</div>
+
+<h3>6.3 Round-trip check &amp; chronological probe (E1c)</h3>
+<p>
+  Với mỗi split, code chạy lại <span class="mono">parse_linearized(linearize(quads))</span> và so số quad
+  thu được với số quad gold <b>có code hợp lệ</b>; lệch → tăng
+  <span class="mono">roundtrip_mismatch</span>. Smoke test <b>assert bằng 0</b>.
+</p>
+<p>
+  <b>Chronological probe:</b> ghép <span class="mono">train + dev</span> rồi cắt theo
+  <span class="mono">review_date</span>: <span class="mono">chrono_train</span> ≤ 2024-06,
+  <span class="mono">chrono_test</span> ≥ 2024-07. <b>Không đụng test gốc</b> để bảng F1 chuẩn vẫn nguyên vẹn.
+</p>
+
+<h3>6.4 Output &amp; số liệu run thật (<span class="mono">data_report.json</span>)</h3>
+<table>
+  <tr><th>File</th><th class="n">Segment</th><th class="n">Quad</th><th>Ghi chú</th></tr>
+  <tr><td><span class="mono">outputs/extract/train.t2t.jsonl</span></td><td class="n">8.816</td><td class="n">16.789</td><td>input train của B-train</td></tr>
+  <tr><td><span class="mono">outputs/extract/dev.t2t.jsonl</span></td><td class="n">1.895</td><td class="n">3.600</td><td>early-stop theo dev loss / dev F1</td></tr>
+  <tr><td><span class="mono">outputs/extract/test.t2t.jsonl</span></td><td class="n">1.890</td><td class="n">3.606</td><td>E1 — <b>dùng một lần cuối</b></td></tr>
+  <tr><td><span class="mono">outputs/extract/chrono_train.t2t.jsonl</span></td><td class="n">7.046</td><td class="n">—</td><td>E1c: train lại từ đầu trên tập này</td></tr>
+  <tr><td><span class="mono">outputs/extract/chrono_test.t2t.jsonl</span></td><td class="n">3.665</td><td class="n">—</td><td>E1c: đo temporal generalization</td></tr>
+</table>
+<p class="sub">16.789 + 3.600 + 3.606 = <b>23.995</b> ✓ đúng tổng quad gold (smoke test assert con số này).</p>
+<p>Mỗi dòng <span class="mono">*.t2t.jsonl</span>: <span class="mono">instance_id · source_review_id · review_date · input · target · n_quads</span>.</p>
+
+<h2>§7 · Module B-train — Seed extractor mT5 <span class="badge gpu">GPU</span></h2>
+<p class="sub"><span class="mono">src/prism/module_b_train.py</span> · <span class="mono">python -m prism.module_b_train --model google/mt5-small --epochs 10</span></p>
+
+<h3>7.1 Vì sao mT5</h3>
+<p>
+  Gold đa ngữ <b>80,5% en · 16,2% vi</b>, còn pool thì ~30% có dấu tiếng Việt — <b>nghịch đảo phân phối</b>.
+  Một backbone chỉ-tiếng-Anh sẽ sập trên phần pool tiếng Việt; một backbone chỉ-tiếng-Việt sẽ sập trên
+  phần gold tiếng Anh. mT5 là lựa chọn tối thiểu-rủi ro; oversample gold tiếng Việt là hướng cải thiện
+  đã ghi nhận (chưa cài).
+</p>
+
+<h3>7.2 Tham số CLI (mặc định trong code)</h3>
+<table>
+  <tr><th>Cờ</th><th>Mặc định</th><th>Cơ sở chọn</th></tr>
+  <tr><td><span class="mono">--model</span></td><td><span class="mono">google/mt5-base</span></td><td>Kaggle thực tế dùng <span class="mono">mt5-small</span> (orchestrator mặc định) vì hạn mức VRAM T4</td></tr>
+  <tr><td><span class="mono">--epochs</span></td><td>10</td><td>self-train gọi lại với <span class="mono">--epochs 3</span></td></tr>
+  <tr><td><span class="mono">--batch</span> · <span class="mono">--grad-accum</span></td><td>8 · 4</td><td>batch hiệu dụng 32; Kaggle dùng 4 · 8</td></tr>
+  <tr><td><span class="mono">--lr</span></td><td>3e-4</td><td>AdamW + linear schedule, warmup <b>6%</b> tổng số bước, clip grad-norm 1,0</td></tr>
+  <tr><td><span class="mono">--max-src</span></td><td>160</td><td>segment mean 13 từ, max 147</td></tr>
+  <tr><td><span class="mono">--max-tgt</span></td><td>192</td><td>max 23 quad/segment</td></tr>
+  <tr><td><span class="mono">--seed</span></td><td><span class="mono">RANDOM_SEED</span> = 20260821</td><td>seed cả <span class="mono">random</span> và <span class="mono">torch</span></td></tr>
+  <tr><td><span class="mono">--train-file</span> · <span class="mono">--dev-file</span></td><td><span class="mono">extract/train.t2t.jsonl</span> · <span class="mono">dev.t2t.jsonl</span></td><td>đổi sang <span class="mono">chrono_train.t2t.jsonl</span> cho probe E1c</td></tr>
+  <tr><td><span class="mono">--out</span></td><td><span class="mono">models/seed_extractor</span></td><td>self-train ghi <span class="mono">models/selftrain_round&lt;r&gt;</span></td></tr>
+</table>
+<p>
+  Device tự chọn <span class="mono">cuda → mps → cpu</span>. Label padding được đặt
+  <span class="mono">-100</span> để loại khỏi loss. <b>Keep-best theo dev loss</b>: chỉ lưu checkpoint khi
+  dev loss giảm (kèm tokenizer), nên thư mục output luôn là epoch tốt nhất chứ không phải epoch cuối.
+</p>
+
+<h3>7.3 Output</h3>
+<pre>models/seed_extractor/
+├── config.json  generation_config.json  model.safetensors   <span class="c"># 2,1 GB với mt5-small (fp32)</span>
+├── tokenizer.json  tokenizer_config.json  (+ spiece)
+└── training_log.json    <span class="c"># {"args": {...}, "history": [...], "best_dev_loss": ..., "device": ...}</span></pre>
+
+<h3>7.4 Log run thật (mt5-small · T4 · 10 epoch)</h3>
+<table>
+  <tr><th class="n">Epoch</th><th class="n">1</th><th class="n">2</th><th class="n">3</th><th class="n">4</th><th class="n">5</th><th class="n">6</th><th class="n">7</th><th class="n">8</th><th class="n">9</th><th class="n">10</th></tr>
+  <tr><td>train loss</td><td class="n">5,867</td><td class="n">0,408</td><td class="n">0,315</td><td class="n">0,270</td><td class="n">0,241</td><td class="n">0,222</td><td class="n">0,208</td><td class="n">0,196</td><td class="n">0,188</td><td class="n">0,183</td></tr>
+  <tr><td>dev loss</td><td class="n">0,332</td><td class="n">0,265</td><td class="n">0,234</td><td class="n">0,217</td><td class="n">0,210</td><td class="n">0,201</td><td class="n">0,197</td><td class="n">0,193</td><td class="n"><b>0,190</b></td><td class="n">0,191 ↑</td></tr>
+  <tr><td>giây/epoch</td><td class="n">395</td><td class="n">399</td><td class="n">397</td><td class="n">397</td><td class="n">397</td><td class="n">397</td><td class="n">399</td><td class="n">397</td><td class="n">398</td><td class="n">397</td></tr>
+</table>
+<p class="sub">
+  <span class="mono">best_dev_loss = 0,190413</span> tại epoch 9 → checkpoint lưu là epoch 9
+  (epoch 10 dev loss tăng nhẹ, đúng hành vi keep-best). Tổng ~66 phút.
+  <b>Lưu ý:</b> dev loss thấp <b>không</b> thay cho F1 — phải chạy §8 để có số báo cáo.
+</p>
+
+<h2>§8 · Module B-eval — E1 / E1b / E1c <span class="badge gpu">GPU</span> <span class="badge opt">tùy chọn</span></h2>
+<p class="sub"><span class="mono">src/prism/module_b_eval.py</span> · không nằm trong chuỗi Kaggle bắt buộc, nhưng <b>là bảng số tham chiếu bắt buộc của paper</b></p>
+
+<h3>8.1 Định nghĩa metric</h3>
+<div class="fx">
+  <b>quad_key(q)</b> = ( norm_text(aspect_term), taxonomy_code, norm_text(opinion_term), sentiment )
+  <span class="why">Exact match = trùng <b>cả 4 thành phần</b> — cùng quy ước với <span class="mono">evaluation/quadruple_metrics.py</span> của HAMoS. <span class="mono">aspect_category</span> không tham gia (nó là hàm của code).</span>
+</div>
+<p>
+  So khớp bằng <b>multiset</b> (<span class="mono">collections.Counter</span>) rồi lấy giao
+  <span class="mono">&amp;</span> → xử lý đúng trường hợp một instance có nhiều quad giống nhau.
+  <span class="mono">prf(n_gold, n_pred, n_hit)</span> → <span class="mono">{P, R, F1, gold, pred, hit}</span>,
+  làm tròn 4 chữ số.
+</p>
+
+<h3>8.2 Sáu chiều phân tích</h3>
+<table>
+  <tr><th>Khoá report</th><th>Cấp lọc</th><th>Nhóm</th><th>Dùng để làm gì</th></tr>
+  <tr><td><span class="mono">overall</span></td><td>—</td><td>toàn test</td><td><b>E1</b> — số F1 chính</td></tr>
+  <tr><td><span class="mono">by_language</span></td><td>instance</td><td><span class="mono">en · vi · other</span> (từ <span class="mono">languages[0]</span> của gold meta, có fallback lấy từ chính dòng split).
+        Bản cũ so <span class="mono">== "other"</span> với mã ngôn ngữ thật (ko/zh/fr/&ldquo;?&rdquo;) nên bucket này
+        <b>luôn rỗng</b> và mọi review không en/vi <b>bị bỏ khỏi bảng</b>. Nay report ghi kèm cờ
+        <span class="mono">by_language_covers_overall</span> — bất biến: tổng <span class="mono">gold</span> của 3 bucket
+        phải bằng <span class="mono">overall.gold</span></td><td>E1b — dự kiến vi thấp hơn en rõ rệt</td></tr>
+  <tr><td><span class="mono">by_length</span></td><td>instance</td><td>L0/L1/L2 theo số từ của <span class="mono">g["text"]</span></td><td>E1b — <b>L2 thấp = xác nhận recall lệch theo độ dài (D-a)</b></td></tr>
+  <tr><td><span class="mono">by_polarity</span></td><td>instance</td><td>instance vào bucket <i>s</i> nếu <b>có</b> quad gold mang <i>s</i></td><td>chỉ để tham khảo — bucket trộn lẫn quad khác cực</td></tr>
+  <tr><td><span class="mono">by_polarity_quad</span></td><td><b>quad</b></td><td>chỉ quad mang đúng <i>s</i></td><td><b>số đo trực tiếp cho M3a</b> (recall lệch theo cực tính)</td></tr>
+  <tr><td><span class="mono">by_category</span></td><td><b>quad</b></td><td>6 category</td><td>báo cáo per-category (per-code vô nghĩa với 17 code hiếm)</td></tr>
+</table>
+<p>
+  Output: <span class="mono">&lt;out-prefix&gt;_report.json</span> (mặc định
+  <span class="mono">outputs/extract/eval_report.json</span>) + <span class="mono">&lt;prefix&gt;_preds.jsonl</span>
+  (<span class="mono">{instance_id, quads}</span> cho phép audit tay). Sinh prediction bằng
+  <span class="mono">generate(num_beams=4, max_length=--max-tgt)</span>, batch 16.
+</p>
+<div class="item warn">
+  <div class="hd">Cách đọc bảng E1 <span class="badge p3">P3</span></div>
+  <ul>
+    <li><span class="mono">by_language.vi</span> ≪ <span class="mono">en</span> → đúng dự đoán; cân nhắc oversample vi.</li>
+    <li><span class="mono">by_length.L2</span> thấp → <b>số này đi thẳng vào paper</b> làm bằng chứng cho D-a.</li>
+    <li>E1c tụt mạnh so với E1 → temporal generalization kém → <b>mọi kết luận drift phải hạ mức tự tin</b>.</li>
+  </ul>
+</div>
+
+<h2 class="pb">§9 · Module B-selftrain — Teacher → Student <span class="badge gpu">GPU</span></h2>
+<p class="sub"><span class="mono">src/prism/module_b_selftrain.py</span> · <span class="mono">python -m prism.module_b_selftrain --rounds 2 --cohort B-anchor</span></p>
+<p class="lead">
+  Vòng lặp self-training <b>có kiểm soát</b>: điều khác biệt với self-training thông thường không phải là
+  vòng lặp, mà là (i) pseudo-label được chọn theo <b>hai</b> ngưỡng — model confidence <b>và</b> provenance
+  posterior; (ii) hai guardrail dừng sớm dựa trên <b>phân phối lớp</b>, không chỉ dev F1.
+</p>
+
+<h3>9.1 Bốn bước mỗi vòng</h3>
+<table>
+  <tr><th>#</th><th>Bước</th><th>Chi tiết cài đặt</th></tr>
+  <tr>
+    <td>1</td><td>Pseudo-label</td>
+    <td><span class="mono">subprocess</span> gọi <span class="mono">prism.module_b_infer --ckpt &lt;teacher&gt; --cohort &lt;cohort&gt; --limit &lt;infer-limit&gt;</span>.
+    Dòng <span class="mono">in_gold</span> bị bỏ tự động bên trong infer. Kết quả ghi đè
+    <span class="mono">extract/pool_quads.&lt;cohort&gt;.jsonl.gz</span></td>
+  </tr>
+  <tr>
+    <td>2</td><td>Chọn pseudo</td>
+    <td><span class="mono">pseudo_rows()</span> giữ quad có <span class="mono">conf_seq ≥ --tau</span> <b>VÀ</b>
+    <span class="mono">p_posterior ≥ --tau-post</span>, gom theo <span class="mono">(review_uid, phi)</span> thành
+    instance t2t (target = <span class="mono">linearize</span> các quad còn lại), shuffle theo
+    <span class="mono">RANDOM_SEED + rnd</span>, cắt còn <span class="mono">max_n = --max-ratio × |gold_train|</span></td>
+  </tr>
+  <tr>
+    <td>3</td><td>Train student</td>
+    <td>Ghi <span class="mono">extract/selftrain_round&lt;r&gt;.t2t.jsonl</span> = <span class="mono">gold_train + pseudo</span>;
+    gọi <span class="mono">module_b_train --model &lt;teacher ckpt&gt; --train-file &lt;mixed&gt; --out models/selftrain_round&lt;r&gt; --epochs 3</span>
+    → <b>tiếp tục từ teacher</b>, không train lại từ base</td>
+  </tr>
+  <tr>
+    <td>4</td><td>Đo dev &amp; dừng</td>
+    <td>Gọi <span class="mono">module_b_eval</span> trên <span class="mono">dev.t2t.jsonl</span> + gold
+    <span class="mono">data/raw/dev.jsonl</span> → đọc <span class="mono">overall.F1</span>;
+    <b>dừng nếu F1 giảm</b> so với vòng trước</td>
+  </tr>
+</table>
+
+<h3>9.2 Hai guardrail (dấu hiệu error propagation)</h3>
+<div class="fx">
+  Guardrail 1 — <b>lệch phân phối lớp</b>: dừng nếu | %negative(pseudo) − 0,154 | &gt; <span class="mono">--max-skew</span> (0,10).
+  <span class="why">0,154 = <span class="mono">gold_neg_rate</span> [đo trên gold] — nay <b>đo tại chỗ</b> bằng <span class="mono">gold_negative_rate(gold_train)</span> mỗi lần chạy <span class="badge new">đã đổi</span>, không hardcode, nên gold cập nhật thì guardrail tự theo. Pseudo lệch cực tính là dấu hiệu extractor tự khuếch đại bias của chính nó — nếu để chạy tiếp, kênh ν sẽ trôi vì <b>công cụ</b>, không vì dữ liệu.</span>
+</div>
+<div class="fx">
+  Guardrail 2 — <b>dev F1 không cải thiện</b>: self-train đo dev F1 của <b>teacher gốc</b> trước vòng 1 (ghi thành <span class="mono">round: 0</span> trong history) và chỉ nhận checkpoint mới khi nó <b>vượt mốc tốt nhất đã thấy</b> <span class="badge new">đã đổi</span>. Bản cũ chỉ so với vòng ngay trước nên vòng 1 <i>luôn</i> được nhận, kể cả khi nó làm dev tụt so với seed — và <span class="mono">final_ckpt</span> có thể tệ hơn seed mà không log nào nói ra.
+  <span class="why">Cả hai guardrail đều <b>break</b> ra khỏi vòng lặp, và <span class="mono">final_ckpt</span> giữ ckpt của vòng cuối <b>đã pass</b>.</span>
+</div>
+
+<h3>9.3 Tham số CLI</h3>
+<table>
+  <tr><th>Cờ</th><th class="n">Mặc định</th><th>Ý nghĩa</th></tr>
+  <tr><td><span class="mono">--rounds</span></td><td class="n">2</td><td>số vòng tối đa</td></tr>
+  <tr><td><span class="mono">--cohort</span></td><td><span class="mono">B-anchor</span></td><td>pool để pseudo-label (1.207 hotel — đủ đa dạng, chưa quá to)</td></tr>
+  <tr><td><span class="mono">--tau</span></td><td class="n">0,7</td><td>ngưỡng <span class="mono">conf_seq</span></td></tr>
+  <tr><td><span class="mono">--tau-post</span></td><td class="n">0,8</td><td>ngưỡng <span class="mono">p_posterior</span> — <b>lọc mềm</b>: quad <span class="mono">provenance_flip</span> vẫn được giữ nếu posterior đủ cao</td></tr>
+  <tr><td><span class="mono">--max-ratio</span></td><td class="n">3,0</td><td>pseudo tối đa = 3× |gold train| = <b>26.448 instance</b></td></tr>
+  <tr><td><span class="mono">--max-skew</span></td><td class="n">0,10</td><td>guardrail 1</td></tr>
+  <tr><td><span class="mono">--infer-limit</span></td><td class="n">200.000</td><td>số <b>đơn vị suy luận</b> tối đa mỗi vòng</td></tr>
+</table>
+
+<h3>9.4 Output</h3>
+<pre>models/selftrain_round1/ , models/selftrain_round2/ …
+outputs/extract/selftrain_round&lt;r&gt;.t2t.jsonl        <span class="c"># tập trộn gold ∪ pseudo</span>
+outputs/extract/dev_round&lt;r&gt;_report.json            <span class="c"># eval từng vòng</span>
+outputs/extract/selftrain_history.json
+  { "history": [{"round":1,"dev_f1":…,"n_pseudo":…,"neg_rate":…}, …],
+    "final_ckpt": "models/selftrain_round2",          <span class="c"># ← infer chính thức PHẢI dùng cái này</span>
+    "args": {…} }</pre>
+
+<h3>9.5 Cạm bẫy vận hành</h3>
+<div class="item warn">
+  <div class="hd">Store là <b>input</b> của self-train, không phải sản phẩm của B</div>
+  <p>
+    Bước infer nội bộ cần <span class="mono">outputs/store/reviews.jsonl.gz</span> +
+    <span class="mono">hotel_cohorts.json</span>. Trên Kaggle, quên attach store → lỗi
+    “thiếu hotel_cohorts.json”. Đây là output của Module A.
+  </p>
+</div>
+<div class="item warn">
+  <div class="hd">Ngân sách thời gian: <span class="mono">--infer-limit</span> mặc định 200k là quá lớn cho Kaggle</div>
+  <p>
+    Notebook <span class="mono">04_selftrain</span> dùng <span class="mono">--limit 4000</span>; ghi chú
+    trong repo: mặc định 200k mất <b>~58 h/vòng</b> trên T4 — vượt hạn mức phiên (~9–12 h). Tăng dần khi
+    có thêm quota. <span class="mono">module_b_selftrain</span> nay nhận trực tiếp <span class="mono">--batch</span> /
+    <span class="mono">--score-batch</span> và truyền xuống bước infer nội bộ; orchestrator không còn
+    vá source lúc chạy (§17.4).
+  </p>
+</div>
+
+<h2 class="pb">§10 · Module B-infer — Pool chính thức + provenance posterior <span class="badge gpu">GPU</span></h2>
+<p class="sub">
+  <span class="mono">src/prism/module_b_infer.py</span> ·
+  <span class="mono">python -m prism.module_b_infer --ckpt models/selftrain_round&lt;N&gt; --cohort &lt;cohort&gt;</span> ·
+  <b>step nặng nhất của pipeline</b>
+</p>
+
+<h3>10.1 Đơn vị suy luận: mỗi review tối đa 2 đơn vị</h3>
+<p>
+  <span class="mono">units()</span> đọc store theo dòng và sinh <b>một đơn vị cho mỗi ô text không rỗng</b>:
+  <span class="mono">(text_pos, φ=POS)</span> và <span class="mono">(text_neg, φ=NEG)</span>. Bỏ qua:
+  dòng <span class="mono">in_gold=true</span> (blocklist) và hotel không thuộc cohort
+  (<span class="mono">keep</span> rỗng = corpus = mọi hotel).
+</p>
+<div class="item keep">
+  <div class="hd">Vì sao gắn φ theo <b>từng đoạn</b> chứ không theo review</div>
+  <p>
+    Nguồn trường là thuộc tính của <b>đoạn văn bản</b>: cùng một review có đoạn nằm trong ô “điểm cộng”
+    và đoạn nằm trong ô “chưa hài lòng”. Gắn φ ở mức review sẽ trộn hai prior rất khác nhau
+    (0,931 vs 0,641) và làm posterior mất ý nghĩa.
+  </p>
+</div>
+
+<h3>10.2 <span class="mono">conf_seq</span> — độ tin cậy chuỗi tính bằng teacher forcing</h3>
+<div class="fx">
+  conf_seq = exp( (1/|y|) · Σ<sub>i</sub> log P(y<sub>i</sub> | x, y<sub>&lt;i</sub>) ) — trung bình log-prob token của <b>chính chuỗi đã sinh</b>, rồi lấy exp.
+  <span class="why">Cài trong <span class="mono">seq_conf()</span>: chạy lại một forward pass với <span class="mono">labels = chuỗi đã decode</span>, <span class="mono">log_softmax</span>, rồi <b>gather</b> đúng log-prob của token đã chọn và mask padding.</span>
+</div>
+<div class="item keep">
+  <div class="hd">Vì sao không dùng <span class="mono">generate(output_scores=True)</span> + <span class="mono">compute_transition_scores</span></div>
+  <p>
+    Cách đó giữ logits <b>full-vocab (~250k của mT5)</b> cho <b>mọi</b> bước sinh → OOM ngay trên T4.
+    Cách hiện tại chỉ giữ log-prob của token đã chọn và chunk theo
+    <span class="mono">--score-batch</span>. Đây là lý do tồn tại của
+    <span class="mono">seq_conf</span>/<span class="mono">seq_logprobs</span> thay vì gọi API tiện lợi hơn.
+    <span class="badge new">đã đổi</span> Hai hàm nay là wrapper mỏng của <b>một</b> hàm
+    <span class="mono">_score()</span> trả cả tổng và trung bình log-prob trong <b>cùng một lượt forward</b> —
+    trước đây là hai bản sao gần như từng dòng, nghĩa là hai lần phải sửa khi đổi giới hạn token
+    (nay lấy từ <span class="mono">config.MAX_SRC_TOKENS</span>/<span class="mono">MAX_TGT_TOKENS</span> thay vì
+    hardcode 160/192 ở 6 chỗ).
+  </p>
+</div>
+
+<div class="item warn">
+  <div class="hd">Rescore bị <b>truncate</b> làm posterior thoái hoá thành prior thuần <span class="badge new">đã đổi</span></div>
+  <p>
+    Bước rescore dựng <b>toàn bộ</b> target cho mỗi biến thể sentiment, nên unit có <span class="mono">n</span> quad
+    phải chấm <span class="mono">3n</span> chuỗi <b>mỗi chuỗi dài n quad</b> — chi phí <b>bậc hai</b> theo số quad
+    (đây cũng là lý do <span class="mono">--score-batch</span> tách riêng khỏi <span class="mono">--batch</span>).
+  </p>
+  <p>
+    Với <span class="mono">MAX_TGT_TOKENS = 192</span>, unit nhiều quad (khoảng ≥9–10 quad, tuỳ tokenizer) bị
+    truncate mất <b>chính cái quad đang xét</b> → cả 3 biến thể tokenize <b>giống nhau</b> → log-prob bằng nhau →
+    <span class="mono">p_model = (⅓,⅓,⅓)</span> → posterior thành <b>prior thuần</b>: sentiment do φ quyết định hoàn
+    toàn và <span class="mono">provenance_flip</span> bật lung tung. Không exception nào, chỉ là số. Gold có segment
+    tới <b>23 quad</b> nên đường này chạm được.
+  </p>
+  <p>
+    Nay phát hiện bằng <span class="mono">max(lp) − min(lp) &lt; DEGENERATE_LP_EPS</span> và ghi hai cờ vào từng
+    dòng output: <span class="mono">p_model_exact</span> (rescore thật) và <span class="mono">p_model_truncated</span>.
+    Cuối run log tỷ lệ. Module C/D vì thế lọc được các quad này.
+  </p>
+</div>
+
+<h3>10.3 <span class="mono">P_model(s|x)</span> — rescore 3 biến thể sentiment</h3>
+<p>
+  Với <b>mỗi quad</b> đã sinh, tạo 3 target biến thể — <b>chỉ đổi sentiment của đúng quad đó</b>, giữ nguyên
+  mọi quad khác — rồi tính <b>tổng log-prob</b> của từng biến thể (<span class="mono">seq_logprobs</span>)
+  và softmax trên 3 giá trị đó:
+</p>
+<div class="fx">
+  P<sub>model</sub>(s | x) = softmax<sub>s∈{pos,neu,neg}</sub> ( Σ<sub>i</sub> log P( y<sup>(s)</sup><sub>i</sub> | x, y<sup>(s)</sup><sub>&lt;i</sub> ) )
+  <span class="why">Chi phí: 3 forward pass <b>mỗi quad</b> (không phải mỗi review) — đây chính là lý do infer đắt. <span class="mono">--no-rescore</span> thay bằng xấp xỉ one-hot <b>(0,9 / 0,05 / 0,05)</b>; khi đó “posterior” chỉ còn là hàm tất định của (s dự đoán, φ) và <b>λ mất ý nghĩa</b> → chỉ dùng để debug.</span>
+</div>
+
+<h3>10.4 Provenance posterior</h3>
+<div class="fx">
+  P(s | x, φ) ∝ P<sub>model</sub>(s | x)<sup>λ</sup> · P(s | φ)<sup>1−λ</sup> &nbsp;&nbsp;(λ = 0,7)
+  <span class="why">Cài trong <span class="mono">apply_provenance()</span> dưới dạng log-linear rồi softmax ổn định số (trừ max trước khi <span class="mono">exp</span>): <span class="mono">post[s] = λ·log P_model[s] + (1−λ)·log prior[s]</span>. Trả về <span class="mono">(s*, p_posterior)</span> với s* = argmax và p_posterior = xác suất chuẩn hoá của s*.</span>
+</div>
+<p>
+  Nếu <span class="mono">s* ≠ sentiment_model</span> → gắn cờ
+  <span class="mono">provenance_flip = true</span>. <b>Quad bị lật vẫn được giữ</b> (không lọc) để audit —
+  đây là nhóm tập trung mỉa mai, phủ định và lỗi extractor.
+</p>
+
+<h3>10.5 Vòng <span class="mono">flush()</span> — trình tự thực thi một batch</h3>
+<pre>1. tok(TASK_PREFIX + text)                      → enc          (truncate 160)
+2. model.generate(num_beams=4, max_length=192)  → chuỗi target
+3. tok.decode(skip_special_tokens=True)         → texts_out
+4. seq_conf(inputs, texts_out)                  → conf_seq mỗi ĐƠN VỊ
+5. parse_linearized(texts_out[i])               → danh sách quad (đã hard-filter taxonomy)
+6. nếu KHÔNG --no-rescore:
+     với mỗi (đơn vị bi, quad qi, sentiment s) → dựng target biến thể
+     seq_logprobs(tất cả biến thể, chunk theo --score-batch) → softmax → p_model[(bi,qi)]
+7. apply_provenance(p_model, phi, lam)          → (sentiment, p_posterior)
+8. ghi 1 dòng JSON / quad vào .jsonl.gz (ghi streaming, không giữ trong RAM)</pre>
+
+<h3>10.6 Schema <span class="mono">outputs/extract/pool_quads.&lt;cohort&gt;.jsonl.gz</span></h3>
+<table>
+  <tr><th>Nhóm</th><th>Trường</th><th>Ghi chú</th></tr>
+  <tr>
+    <td><b>Quad</b></td>
+    <td><span class="mono">aspect_term · taxonomy_code · aspect_category · opinion_term · aspect_implicit · opinion_implicit</span></td>
+    <td>từ <span class="mono">parse_linearized</span></td>
+  </tr>
+  <tr>
+    <td><b>Ngữ cảnh</b></td>
+    <td><span class="mono">text · review_uid · hotel_id · period · stratum · phi · score · has_photo · n_words</span></td>
+    <td>copy từ store (theo <b>đơn vị</b>, nên <span class="mono">text</span> là ô text của đúng φ đó)</td>
+  </tr>
+  <tr>
+    <td><b>Suy luận</b></td>
+    <td><span class="mono">conf_seq</span> (4 số) · <span class="mono">sentiment_model</span> · <span class="mono">p_model{positive,neutral,negative}</span> · <span class="mono">sentiment</span> (= s* hậu nghiệm) · <span class="mono">p_posterior</span> · <span class="mono">provenance_flip</span></td>
+    <td><b>Cẩn thận:</b> <span class="mono">sentiment</span> là <b>posterior</b>, sentiment gốc của model nằm ở <span class="mono">sentiment_model</span>. Module D và C đều đọc <span class="mono">sentiment</span></td>
+  </tr>
+</table>
+<p class="sub">
+  Chưa có <span class="mono">quad_uid</span> ở bước này — nó được thêm ở
+  <span class="mono">module_c_reliability.apply_weights</span> (và dựng lại on-the-fly ở
+  <span class="mono">fit_bridge</span> để join với mẫu audit).
+</p>
+
+<h3>10.7 Tham số &amp; ngân sách</h3>
+<table>
+  <tr><th>Cờ</th><th class="n">Mặc định</th><th>Ghi chú</th></tr>
+  <tr><td><span class="mono">--ckpt</span></td><td><span class="mono">models/seed_extractor</span></td><td><b>Kết quả chính thức phải trỏ tới <span class="mono">final_ckpt</span> của self-train</b></td></tr>
+  <tr><td><span class="mono">--cohort</span></td><td><span class="mono">T-unbiased</span></td><td>chạy cohort nhỏ trước, <span class="mono">corpus</span> sau cùng</td></tr>
+  <tr><td><span class="mono">--batch</span></td><td class="n">32</td><td>Kaggle T4 dùng 2</td></tr>
+  <tr><td><span class="mono">--score-batch</span></td><td class="n">48</td><td>batch cho rescore; Kaggle dùng 4</td></tr>
+  <tr><td><span class="mono">--lam</span></td><td class="n">0,7</td><td>= <span class="mono">PROVENANCE_LAMBDA</span></td></tr>
+  <tr><td><span class="mono">--limit</span></td><td class="n">0</td><td>0 = không giới hạn; đếm theo <b>đơn vị</b> (không phải review)</td></tr>
+  <tr><td><span class="mono">--no-rescore</span></td><td>off</td><td><b>Không dùng cho kết quả paper</b> (quy tắc bất biến §19.4)</td></tr>
+</table>
+<p>
+  Thứ tự khuyến nghị: <span class="mono">T-unbiased</span> (514 hotel) →
+  <span class="mono">B-anchor</span> → <span class="mono">corpus</span> (~1,15M review có text — chạy qua đêm/nhiều phiên).
+</p>
+
+<h2 class="pb">§11 · Ảnh pool &amp; hai mẫu annotation người</h2>
+
+<h3>11.1 <span class="mono">scripts/download_pool_photos.py</span> <span class="badge net">NET</span></h3>
+<table class="kv">
+  <tr><td>IN</td><td><span class="mono">outputs/store/reviews.jsonl.gz</span></td></tr>
+  <tr><td>OUT</td><td><span class="mono">outputs/reliability/pool_images/&lt;review_uid&gt;.jpg</span> + <span class="mono">pool_image_index.json</span> = <span class="mono">{review_uid: đường dẫn TUYỆT ĐỐI}</span></td></tr>
+  <tr><td>Chọn review</td><td><span class="mono">has_photo=true</span> ∧ <span class="mono">in_gold=false</span> ∧ thuộc cohort ∧ có <span class="mono">photo_urls</span></td></tr>
+  <tr><td>Lấy ảnh nào</td><td><b>ảnh đầu tiên</b> (<span class="mono">photo_urls[0]</span>), chỉ nhận scheme http/https</td></tr>
+  <tr><td>Cờ</td><td><span class="mono">--cohort</span> (T-unbiased) · <span class="mono">--limit 0</span> · <span class="mono">--sleep 0.4</span> · <span class="mono">--timeout 15</span></td></tr>
+  <tr><td>Resume</td><td>Ảnh đã có trên đĩa (size&gt;0) được bỏ qua nhưng <b>vẫn vào index</b>; index được checkpoint mỗi 200 ảnh mới</td></tr>
+  <tr><td>Lỗi</td><td>Đếm <span class="mono">n_err</span>, log 20 lỗi đầu, không dừng chạy</td></tr>
+</table>
+<div class="item warn">
+  <div class="hd">Đường dẫn tuyệt đối → <span class="mono">photos</span> và các stage C phải chạy <b>cùng session</b></div>
+  <p>
+    <span class="mono">pool_image_index.json</span> lưu path tuyệt đối
+    (<span class="mono">/kaggle/working/…</span>). Attach lại ở notebook khác thì path lệch và
+    <span class="mono">apply_verifier</span> sẽ bỏ qua toàn bộ ảnh (im lặng: quad chỉ không có
+    <span class="mono">v_image</span>) → bridge báo “chưa có v_image”.
+  </p>
+</div>
+
+<h3>11.2 <span class="mono">make_audit_samples.py</span> — hai mẫu <b>tách biệt</b></h3>
+<table>
+  <tr><th>Mẫu</th><th>Tạo khi nào</th><th>File</th><th>Phân tầng</th><th>Người annotate điền</th><th>Dùng cho</th></tr>
+  <tr>
+    <td><b>D0</b></td><td>ngay sau Module A</td>
+    <td><span class="mono">reliability/d0_sample_300.jsonl</span></td>
+    <td><span class="mono">length_bin</span>(3) × <span class="mono">có/không text_neg</span>(2) = <b>6 ô</b>, CAP 200/ô, 50 mẫu/ô</td>
+    <td><span class="mono">gold_quads</span>: <b>toàn bộ</b> quad của review (văn bản đầy đủ, không cắt)</td>
+    <td><b>D-a</b>: bảng recall ρ̂(sentiment, length_bin) → <span class="mono">outputs/drift/recall_table.json</span></td>
+  </tr>
+  <tr>
+    <td><b>AUDIT</b></td><td>sau khi có pool_quads</td>
+    <td><span class="mono">reliability/audit_sample_300.jsonl</span></td>
+    <td><span class="mono">conf_band</span>(lo&lt;0,6 · mid&lt;0,85 · hi) × <span class="mono">phi</span>(2) × <span class="mono">provenance_flip</span>(2) = <b>≤12 ô</b>, CAP 300/ô, 25 mẫu/ô</td>
+    <td><span class="mono">correct</span>: 0 | 1 cho từng quad</td>
+    <td><b>Module C3</b>: fit bridge + Spearman go/no-go</td>
+  </tr>
+</table>
+<div class="item bad">
+  <div class="hd">Không được trộn hai mẫu <span class="badge p1">P1</span></div>
+  <p>
+    D0 đo <b>recall</b> của extractor (phải annotate đầy đủ văn bản); AUDIT đo <b>precision</b> của
+    pseudo-quad (chấm đúng/sai từng quad đã sinh). Dùng cùng một mẫu cho cả hai là <b>circular</b>:
+    bridge sẽ được hiệu chỉnh trên chính tập dùng để đo recall.
+  </p>
+</div>
+<p>
+  <b>Reservoir sampling chuẩn (Algorithm R)</b> cho từng ô: giữ CAP phần tử đầu, sau đó phần tử thứ
+  <i>k</i> thay một slot ngẫu nhiên với xác suất CAP/<i>k</i>. Bản cũ dùng xác suất cố định → mẫu lệch về
+  các dòng đến sau trong file (và file pool sắp xếp theo thời gian ⇒ mẫu lệch <b>theo thời gian</b>).
+  D0 loại <span class="mono">in_gold</span> và các dòng không có text.
+</p>
+
+<h2 class="pb">§12 · Module C — Cross-Modal Reliability Calibration <span class="badge p1">lõi novelty · go/no-go</span></h2>
+<p class="sub">
+  <span class="mono">src/prism/module_c_reliability.py</span> ·
+  <span class="mono">--stage {train_verifier, apply_verifier, bridge, apply}</span> — <b>4 stage đúng thứ tự này</b>
+</p>
+
+<h3>12.1 Vấn đề module này giải</h3>
+<p>
+  Mọi tín hiệu text-based — model confidence, cross-model agreement, field provenance — <b>chia sẻ cùng
+  một nguồn lỗi</b>. Hai model train trên cùng gold sẽ cùng sai một kiểu; agreement cao <b>không</b> chứng
+  minh đúng. Đây là lỗ hổng circularity mà không tín hiệu text nào bịt được. Ảnh là một <b>sensor khác</b>:
+  nó không chia sẻ nguồn lỗi đó. Đóng góp không phải “dùng ảnh để extract tốt hơn” (multimodal ABSA đã làm)
+  mà là <b>dùng ảnh để ước lượng độ tin cậy pseudo-label, rồi suy rộng ra ngoài phạm vi có ảnh</b> —
+  6,24% review có ảnh hiệu chỉnh cho 93,76% còn lại.
+</p>
+
+<h3>12.2 Giới hạn phạm vi (bắt buộc khai báo — chính nó làm claim đáng tin)</h3>
+<table>
+  <tr><th>Giới hạn</th><th class="n">Số đo</th><th>Hệ quả</th></tr>
+  <tr><td>Đa số review chỉ có 1 ảnh</td><td class="n"><b>95,6%</b> (8.412/8.796)</td><td>Grounding ở <b>mức review</b>, không phải mức quad</td></tr>
+  <tr><td>Một ảnh phải “gánh” nhiều aspect</td><td class="n"><b>42,6%</b></td><td>review 1-ảnh có quad trải &gt;1 taxonomy code → ảnh không xác thực được toàn bộ quad</td></tr>
+  <tr><td>Cực tính lẫn lộn dưới 1 ảnh</td><td class="n">13,3%</td><td>Ảnh khó xác thực <i>s</i> ở mức quad</td></tr>
+  <tr><td>Review nhiều ảnh gán đúng ảnh khác nhau</td><td class="n">349/384 = 90,9%</td><td>Cỡ mẫu quá nhỏ để làm claim quad-level</td></tr>
+</table>
+<p>
+  → <b>Phạm vi hợp lệ:</b> ảnh xác thực <b>kênh category</b> và cực tính thô ở <b>mức review</b>.
+  <b>Không</b> xác thực span (aspect_term, opinion_term). Vì vậy verifier được học ở mức
+  <span class="mono">REVIEW × CATEGORY</span> — đây là phạm vi duy nhất mà alignment cho phép.
+</p>
+
+<h3>12.3 Ngưỡng go/no-go — chốt <b>trước</b> khi chạy (chống HARKing)</h3>
+<pre>GO_NOGO = {"verifier_auc_min": 0.70, "verifier_delta_auc_min": 0.05, "bridge_spearman_min": 0.30}</pre>
+<table>
+  <tr><th>#</th><th>Kiểm tra</th><th>Ngưỡng</th><th>Vì sao ngưỡng đó</th></tr>
+  <tr><td>1</td><td>AUC của V trên gold <b>test</b></td><td>≥ 0,70</td><td>Sàn “ảnh có tín hiệu”</td></tr>
+  <tr><td>2</td><td><b>ΔAUC</b> = AUC(V) − AUC(baseline không ảnh)</td><td>≥ 0,05</td><td><b>Chống rò rỉ category-prior</b>: one-hot category tự dự đoán được y vì FACILITY có mặt ở hầu hết review. AUC tuyệt đối cao mà không vượt baseline nghĩa là <b>ảnh không đóng góp gì</b> — go/no-go phải dựa trên delta</td></tr>
+  <tr><td>3</td><td>Spearman(r̂, human audit 300 quad)</td><td>≥ 0,30</td><td>Bridge phải tương quan với đánh giá người, không chỉ với chính verifier</td></tr>
+</table>
+<div class="item keep">
+  <div class="hd">NO-GO <b>không chặn pipeline</b></div>
+  <p>
+    Trượt bất kỳ ngưỡng nào → bỏ Module C; <span class="mono">apply_weights</span> tự
+    <b>fallback <span class="mono">w = conf_seq</span></b> (nên chạy kèm temperature scaling) và bài lùi về
+    A+B+D — vẫn đủ tải một bài Q1 (IP&amp;M/KBS), chỉ mất mũi nhọn Information Fusion. Vì vậy
+    <b>chạy C sớm</b> để biết scope, đừng để cuối.
+  </p>
+</div>
+
+<h3>12.4 C1 · <span class="mono">train_verifier</span> <span class="badge gpu">GPU</span></h3>
+<h4>Dựng dataset (<span class="mono">build_verifier_dataset</span>)</h4>
+<table>
+  <tr><th>Bước</th><th>Chi tiết</th></tr>
+  <tr><td>Ảnh của review</td><td><span class="mono">GOLD_IMAGES</span> → <span class="mono">img_of[source_review_id] = [local_path…]</span></td></tr>
+  <tr><td>Category của review</td><td><span class="mono">GOLD_QUADS</span> → <span class="mono">rid = quad_id.rsplit("_Q",1)[0]</span> → <span class="mono">cats_of[rid] = {aspect_category…}</span></td></tr>
+  <tr><td>Nhãn</td><td>Positive: (ảnh, c, y=1) với mọi c ∈ <span class="mono">cats_of[rid]</span>. Negative: sample <span class="mono">min(|pos|, |neg_pool|)</span> category <b>không</b> xuất hiện trong review → <b>cân bằng ~1:1</b></td></tr>
+  <tr><td>Split</td><td>Lấy từ <span class="mono">{train,dev,test}.jsonl</span> theo <span class="mono">source_review_id</span> → <b>hotel-disjoint được thừa hưởng</b>; review không tra được split → mặc định <span class="mono">"train"</span></td></tr>
+  <tr><td>Seed</td><td><span class="mono">random.Random(RANDOM_SEED)</span> — chọn negative tái lập được</td></tr>
+</table>
+<h4>Mô hình</h4>
+<table class="kv">
+  <tr><td>Encoder</td><td><span class="mono">open_clip</span> <b>ViT-B-32 / laion2b_s34b_b79k</b>, <b>ĐÓNG BĂNG</b> (A8: ghi <span class="mono">encoder_version</span> vào report để chống “model version drift”)</td></tr>
+  <tr><td>Text prompt</td><td>6 câu tiếng Anh mô tả 6 category (ví dụ FACILITY = <i>“a photo of a hotel room, building, bathroom or view”</i>), embed một lần rồi L2-normalize</td></tr>
+  <tr><td>Đặc trưng</td><td><span class="mono">x = [cos_sim(img, text_c)] + one_hot(c)</span> → 7 chiều</td></tr>
+  <tr><td>Head</td><td><span class="mono">LogisticRegression(max_iter=1000)</span>, train trên <span class="mono">{train, dev}</span>, test trên <span class="mono">{test}</span></td></tr>
+  <tr><td>Baseline</td><td>Cùng head nhưng <b>bỏ cột sim</b> (<span class="mono">X[:, 1:]</span>) → chỉ one-hot category</td></tr>
+  <tr><td>Cache</td><td>Embed mỗi ảnh <b>một lần</b>, lưu <span class="mono">reliability/image_feats.npy</span> + <span class="mono">image_feats_index.json</span>; ảnh mở lỗi → bỏ qua (không crash)</td></tr>
+</table>
+<h4>Output <span class="mono">verifier_report.json</span></h4>
+<pre>{ "auc_test": …, "auc_no_image_baseline": …, "delta_auc": …,
+  "auc_by_category": {"FACILITY": …, …},   <span class="c"># AUC dùng RIÊNG cos-sim trong từng category</span>
+  "n_train": …, "n_test": …,
+  "go_nogo": "GO" | "NO-GO", "thresholds": {…},
+  "encoder_version": "open_clip/ViT-B-32/laion2b_s34b_b79k" }
++ reliability/verifier.pkl = {"head", "model_name", "pretrained", "prompts"}</pre>
+<p class="sub">
+  <span class="mono">auc_by_category</span> quan trọng khi đọc kết quả: trong <b>một</b> category, one-hot
+  là hằng số nên AUC ở đó phản ánh <b>thuần tín hiệu ảnh</b>. Category có AUC ≈ 0,5 nghĩa là prompt cho
+  category đó vô dụng (dự kiến: LOYALTY, BRANDING — “ảnh mà khách quay lại sẽ chụp” không có nội dung
+  thị giác rõ ràng).
+</p>
+
+<h3>12.5 C2 · <span class="mono">apply_verifier</span> <span class="badge gpu">GPU</span></h3>
+<table class="kv">
+  <tr><td>IN</td><td><span class="mono">--quads</span> = <span class="mono">extract/pool_quads.&lt;cohort&gt;.jsonl.gz</span>; <span class="mono">--image-index</span> = <span class="mono">reliability/pool_image_index.json</span>; <span class="mono">verifier.pkl</span></td></tr>
+  <tr><td>OUT</td><td><span class="mono">--out</span> = <span class="mono">reliability/pool_quads_vimg.&lt;cohort&gt;.jsonl.gz</span> — <b>mọi</b> quad được ghi lại, quad có ảnh được thêm trường <span class="mono">v_image</span> (4 số)</td></tr>
+  <tr><td>Logic</td><td>Nếu <span class="mono">review_uid ∈ index</span>: embed ảnh (cache theo uid, lỗi → cache <span class="mono">None</span>), tính <span class="mono">sim</span> với text-embed của <b>category của quad đó</b>, dựng lại <span class="mono">[sim] + one_hot</span>, chạy <span class="mono">head.predict_proba(...)[0,1]</span></td></tr>
+  <tr><td>Log</td><td><span class="mono">"v_image cho N/M quad"</span> — N=0 nghĩa là index sai path hoặc chưa tải ảnh</td></tr>
+</table>
+<p class="sub">
+  <b>Lưu ý ghép nối:</b> stage <span class="mono">bridge</span> phải đọc <b>file vimg này</b> (không phải
+  <span class="mono">pool_quads</span> gốc) vì nó cần <span class="mono">v_image</span>; còn stage
+  <span class="mono">apply</span> đọc <b>pool_quads gốc</b> + <span class="mono">bridge.pkl</span>.
+  Orchestrator Kaggle đã nối đúng như vậy (§17.3).
+</p>
+
+<h3>12.6 C3 · <span class="mono">bridge</span> — hạt nhân của đóng góp <span class="badge cpu">CPU</span></h3>
+<div class="fx">
+  r̂(q) = g( conf_seq, p_posterior, 1[φ=POS], log(1+n_words), 1[provenance_flip] ) ≈ Pr[ V(ảnh, c<sub>q</sub>) = 1 ]
+  <span class="why">g là <span class="mono">LogisticRegression</span> fit trên tập quad <b>có</b> <span class="mono">v_image</span>, nhãn nhị phân <span class="mono">y = 1[v_image ≥ 0.5]</span>. Vì mọi feature <b>chỉ dùng text</b>, r̂ áp được cho <b>toàn bộ</b> quad — kể cả ~1,03M review không ảnh.</span>
+</div>
+<h4>Hiệu chỉnh covariate shift bằng IPW (bỏ là sai)</h4>
+<table>
+  <tr><th>Nhóm pool có text</th><th class="n">n</th><th class="n">Số từ TB</th><th class="n">Score TB</th></tr>
+  <tr><td><b>Có ảnh</b></td><td class="n">114.988</td><td class="n"><b>56,7</b></td><td class="n"><b>8,90</b></td></tr>
+  <tr><td>Không ảnh</td><td class="n">1.035.427</td><td class="n">36,5</td><td class="n">8,68</td></tr>
+</table>
+<p>
+  Gold <b>100%</b> có ảnh, pool chỉ <b>6,24%</b> → covariate shift nặng. Cài đặt: propensity
+  <span class="mono">LogisticRegression</span> trên <span class="mono">[log(1+n_words), score (điền 8,7 nếu null)]</span>
+  → <span class="mono">P(has_photo)</span>; trọng số <span class="mono">w_ipw = 1 / clip(p, 0.02, 1.0)</span>
+  (clip chặn trọng số nổ). Bridge được fit <b>hai bản</b>: có IPW (<span class="mono">bridge</span>) và
+  không IPW (<span class="mono">bridge_noipw</span>) — để báo cáo có/không hiệu chỉnh.
+  <b>Bản dùng cho <span class="mono">apply</span> là bản có IPW.</b>
+</p>
+<h4>Đối chiếu human audit</h4>
+<p>
+  Nếu <span class="mono">--audit</span> tồn tại: đọc <span class="mono">{quad_uid: correct}</span> (bỏ dòng
+  <span class="mono">correct=null</span>), dựng lại khoá bằng <span class="mono">U.quad_uid(q)</span> cho
+  <b>mọi</b> quad, join, và nếu ≥ <b>30 cặp</b> thì tính
+  <span class="mono">spearmanr(r̂, correct)</span> → ghi
+  <span class="mono">audit_spearman · audit_p · audit_n · go_nogo</span>.
+  Ít hơn 30 cặp → <b>không</b> ghi verdict (im lặng) — đây là dấu hiệu mẫu audit chưa được annotate hoặc
+  khoá không khớp.
+</p>
+<pre>reliability/bridge.pkl        = {"bridge", "bridge_noipw", "propensity"}
+reliability/bridge_report.json = {"n_with_image", "n_total", "coef", "feature_names",
+                                  ["audit_spearman","audit_p","audit_n","go_nogo"]}</pre>
+
+<h3>12.7 C4 · <span class="mono">apply</span> — gắn <span class="mono">w</span> cho mọi quad <span class="badge cpu">CPU</span></h3>
+<div class="fx">
+  w<sub>q</sub> = 1[taxonomy hợp lệ] · 1[span hợp lệ] · r̂(q)
+  <span class="why"><b>Trạng thái cài đặt:</b> code hiện tính <span class="mono">hard = 1.0 if taxonomy_code in CODE2CAT else 0.0</span> — <b>chỉ có thành phần taxonomy</b>; <span class="mono">1[span hợp lệ]</span> chưa được cài (span của pool quad chưa được kiểm tra lại với text). <span class="badge p2">LỆCH</span></span>
+</div>
+<table class="kv">
+  <tr><td>IN</td><td><span class="mono">--quads</span> = pool_quads <b>gốc</b> (không phải vimg) + <span class="mono">bridge.pkl</span> nếu có</td></tr>
+  <tr><td>OUT</td><td><span class="mono">reliability/quads_weighted.jsonl.gz</span> — thêm <span class="mono">w</span> (4 số) và <span class="mono">quad_uid</span> (truy vết row-level)</td></tr>
+  <tr><td>Fallback</td><td><span class="badge new">đã đổi</span> <span class="mono">apply_weights</span> chỉ dùng bridge
+    khi <b><span class="mono">verdict == "GO"</span></b> (verdict lưu <i>trong</i> pickle), và kiểm parity đặc trưng
+    (<span class="mono">feature_names</span> + <span class="mono">n_features_in_</span>) trước khi predict — lệch thì
+    <span class="mono">SystemExit</span> chứ không sinh <span class="mono">w</span> rác. NO-GO hoặc thiếu
+    <span class="mono">bridge.pkl</span> → <span class="mono">r̂ = conf_seq</span> <b>thô</b> (KHÔNG temperature-scale —
+    repo chưa implement), và mỗi dòng ra mang <span class="mono">w_source</span> để Module D truy vết.
+    Bản cũ chỉ kiểm <span class="mono">bp.exists()</span> nên <b>bridge NO-GO vẫn được dùng cho <span class="mono">w</span>
+    của toàn corpus</b> và hợp đồng &ldquo;NO-GO → fallback&rdquo; không bao giờ chạy. Pipeline vẫn chạy tới D</td></tr>
+</table>
+
+<h2 class="pb">§13 · Module D — Dual-Bias Compositional Drift <span class="badge cpu">CPU</span> <span class="badge done">kết quả cuối</span></h2>
+<p class="sub">
+  <span class="mono">src/prism/module_d_drift.py</span> ·
+  <span class="mono">python -m prism.module_d_drift --quads outputs/reliability/quads_weighted.jsonl.gz --cohort corpus --level taxonomy_code --n-boot 1000</span>
+</p>
+
+<h3>13.1 Hai độ lệch, khác nhau về bản chất</h3>
+<table>
+  <tr><th></th><th>Độ lệch</th><th>Bằng chứng đo được</th><th>Bản chất</th><th>Trạng thái cài</th></tr>
+  <tr>
+    <td><b>D-a</b></td><td>Recall lệch theo cực tính × độ dài</td>
+    <td>Gold chỉ phủ <b>26%</b> văn bản gốc (5.355 cặp ghép: 23,6 vs 92,7 từ, token overlap 0,97); phủ ô positive 42% nhưng negative chỉ <b>25%</b></td>
+    <td><b>Lỗi đo của công cụ</b></td>
+    <td><span class="badge todo">STUB</span> — xem §13.9</td>
+  </tr>
+  <tr>
+    <td><b>D-b</b></td><td>Đổi thành phần reviewer</td>
+    <td>VN 89,7%→16,1%; %có text 42,1→63,4%; độ dài 27,5→40,8 từ; hotel/tháng 549→8.535</td>
+    <td><b>Đổi thành phần tổng thể</b></td>
+    <td><span class="badge done">đã cài + kiểm chứng</span></td>
+  </tr>
+</table>
+<p>
+  Gộp hai thứ này làm một là <b>sai khái niệm</b> — và chính sự phân biệt đó là một đóng góp phương pháp
+  cho temporal opinion mining.
+</p>
+
+<h3>13.2 <span class="mono">load_quads</span> — gom về 3 cấu trúc</h3>
+<pre>cell[(period, stratum)][aspect]                = Σ w      <span class="c"># kênh π — CHỈ quad complaint</span>
+vcell[(period, stratum)][aspect][sentiment]    = Σ w      <span class="c"># kênh ν — MỌI quad</span>
+reviews[(period, stratum)] = [(review_uid, {aspect: w}), …]   <span class="c"># cho bootstrap</span></pre>
+<table>
+  <tr><th>Quyết định</th><th>Cài đặt</th></tr>
+  <tr><td>Lọc cohort</td><td><span class="mono">cohort_hotels</span> rỗng = không lọc (corpus). Đọc từ <span class="mono">store/hotel_cohorts.json</span>; file không tồn tại + cohort ≠ corpus → <span class="mono">SystemExit</span> với hướng dẫn chạy Module A</td></tr>
+  <tr><td>Mức aspect</td><td><span class="mono">--level taxonomy_code</span>: code <b>không</b> thuộc <span class="mono">CODES_REPORTABLE</span> → <b>tự gộp lên category cha</b> (<span class="mono">CODE2CAT</span>). <span class="mono">--level aspect_category</span>: dùng thẳng category</td></tr>
+  <tr><td>Trọng số</td><td><span class="mono">w = q.get("w", q.get("conf_seq", 1.0))</span> → chấp nhận cả <span class="mono">quads_weighted</span> (có <span class="mono">w</span>) và <span class="mono">pool_quads</span> (fallback <span class="mono">conf_seq</span>). <span class="mono">w ≤ 0</span> → bỏ quad</td></tr>
+  <tr><td><b>Định nghĩa “lượt phàn nàn”</b></td><td><span class="mono">q["phi"] == "NEG" or q["sentiment"] == "negative"</span> — <b>hợp</b> của hai điều kiện: quad nằm trong ô “chưa hài lòng” <i>hoặc</i> có cực tính negative sau posterior</td></tr>
+</table>
+
+<h3>13.3 Kênh π — <span class="mono">shares_by_period</span> + shrinkage</h3>
+<p>Với mỗi kỳ <i>t</i>: tính <b>share gộp</b> <span class="mono">s0</span> của kỳ (mọi stratum cộng lại), rồi:</p>
+<div class="fx">
+  <b>raw:</b> π<sub>a,t</sub> = pooled<sub>a,t</sub> / Σ<sub>a′</sub> pooled<sub>a′,t</sub><br>
+  <b>adj (direct standardization + shrinkage):</b><br>
+  π̃<sub>a,t</sub> ∝ Σ<sub>g</sub> π<sup>ref</sup><sub>g</sub> · ( n<sub>a,t,g</sub> + m·s0<sub>a,t</sub> ) / ( n<sub>·,t,g</sub> + m ), &nbsp; m = <span class="mono">--min-stratum</span> (30)
+  <span class="why">π<sup>ref</sup><sub>g</sub> = tỷ trọng của stratum <i>g</i> <b>gộp toàn 36 kỳ</b> (<span class="mono">reference_composition</span>) — một thành phần tham chiếu <b>cố định</b>. Ô rỗng đóng góp đúng share gộp của kỳ (trung tính) thay vì bị loại. Cuối cùng chuẩn hoá lại về tổng 1.</span>
+</div>
+<p>
+  Câu hỏi mà bước này trả lời: <i>nếu thành phần khách không đổi thì cơ cấu phàn nàn có đổi không?</i>
+  Độ phủ strata đo được: trung bình <b>99,2%</b>, thấp nhất 74,2% → hiệu chỉnh gần như không mất dữ liệu.
+  Chuỗi đưa vào phân tích trend là <b>clr(π<sub>t</sub>)<sub>a</sub></b> (§4.5).
+</p>
+
+<h3>13.4 Kênh ν — <span class="mono">valence_by_period</span></h3>
+<div class="fx">
+  <b>raw:</b> ν<sub>a,t</sub> = Σ<sub>g</sub> w<sub>neg</sub> / Σ<sub>g</sub> w<sub>all</sub> (tỷ lệ gộp của kỳ)<br>
+  <b>adj:</b> ν̃<sub>a,t</sub> = [ Σ<sub>g</sub> π<sup>ref</sup><sub>g</sub> · ( w<sub>neg,g</sub> + m<sub>ν</sub>·ν0 ) / ( w<sub>all,g</sub> + m<sub>ν</sub> ) ] / Σ<sub>g</sub> π<sup>ref</sup><sub>g</sub>, &nbsp; m<sub>ν</sub> = <span class="mono">--min-valence-w</span> (10)
+  <span class="why">ν0 = tỷ lệ gộp của kỳ (prior Beta). Tham chiếu của kênh ν được tính riêng (<span class="mono">reference_composition_valence</span>, dựa trên <b>mọi</b> quad) chứ không dùng lại tham chiếu của kênh π (chỉ complaint). Kỳ không có quad nào của aspect → <span class="mono">None</span> (bỏ khỏi chuỗi, không nội suy).</span>
+</div>
+
+<h3>13.5 Máy trend</h3>
+<table>
+  <tr><th>Hàm</th><th>Công thức / logic</th><th>Ghi chú</th></tr>
+  <tr>
+    <td><span class="mono">deseason(series, periods)</span></td>
+    <td>y′<sub>t</sub> = y<sub>t</sub> − ( mean(tháng của t) − mean(toàn chuỗi) )</td>
+    <td>Khử hiệu ứng tháng-trong-năm bằng trung bình theo tháng. <b>Bắt buộc</b>: biên độ mùa của FAC_CLIMATE/AM_POOL lớn gấp ~4× aspect khác</td>
+  </tr>
+  <tr>
+    <td><span class="mono">ols_trend(series)</span></td>
+    <td>OLS trên index kỳ; trả <b>(slope × 12, t = b/se)</b></td>
+    <td>slope quy về <b>mỗi năm</b>; se dùng residual với df = n−2. n ≤ 2 → se = 0 → t = 0</td>
+  </tr>
+  <tr>
+    <td><span class="mono">best_split(series)</span></td>
+    <td>c* = argmax<sub>c</sub> |Welch-t( y<sub>1:c</sub>, y<sub>c+1:T</sub> )| với c ∈ [4, T−4)</td>
+    <td>Yêu cầu <b>tối thiểu 4 điểm mỗi phía</b> → không bắt changepoint ở hai biên</td>
+  </tr>
+  <tr>
+    <td><span class="mono">permutation_p(...)</span></td>
+    <td>Xáo <b>thứ tự thời gian</b> của chuỗi (giữ nguyên tập giá trị), tính lại <span class="mono">best_split(deseason(...))</span>, p = (hits + 1)/(n_perm + 1)</td>
+    <td><b>Null riêng cho từng chuỗi</b> — ngưỡng khác nhau rõ rệt giữa các aspect. Cộng 1 ở tử/mẫu → p không bao giờ bằng 0</td>
+  </tr>
+  <tr>
+    <td><span class="mono">channel_stats(...)</span></td>
+    <td>Bỏ điểm <span class="mono">None</span>; <b>&lt;12 điểm → trả <span class="mono">None</span></b> (chuỗi không đủ dài để kết luận)</td>
+    <td>Trả <span class="mono">{slope_per_year, t_stat, changepoint, welch_t, p_perm, p_perm_changepoint}</span>
+        — <b>hai kiểm định permutation riêng</b>: <span class="mono">p_perm</span> cho thống kê
+        <b>TREND</b> (khớp với <span class="mono">slope_per_year</span>/<span class="mono">t_stat</span> được báo cáo và với
+        verdict) và <span class="mono">p_perm_changepoint</span> cho bước nhảy. <span class="badge new">đã đổi</span>
+        Trước đây chỉ permute thống kê changepoint rồi báo p đó cạnh slope OLS, nên
+        <span class="mono">significant_after_fdr</span> thực chất là &ldquo;có bước nhảy&rdquo; trong khi verdict lại gate
+        trên dấu slope — aspect trôi đơn điệu mà không có bước nhảy bị gọi là &ldquo;phẳng&rdquo;.
+        BH-FDR nay chạy trên thống kê <b>trend</b></td>
+  </tr>
+</table>
+
+<h3>13.6 Bootstrap CI (kênh π-adj)</h3>
+<p>
+  Resample <b>review trong từng ô (kỳ × stratum)</b> — có hoàn lại, giữ đúng số review của ô — rồi dựng
+  lại <span class="mono">cell_b</span>, tính lại share adj, deseason, OLS. Percentile 2,5% / 97,5% →
+  <span class="mono">adj.slope_ci95</span>.
+</p>
+<div class="item keep">
+  <div class="hd">Một bản resample dùng chung cho <b>mọi</b> aspect</div>
+  <p>
+    Vòng bootstrap nằm <b>ngoài</b> vòng per-aspect: mỗi lượt tạo <b>một</b> bản resample rồi lấy slope
+    cho tất cả aspect từ chính bản đó. Vừa nhanh gấp |aspects| lần, vừa <b>đúng hơn</b> — các aspect chia
+    sẻ cùng phương án resample nên tương quan giữa các share của một composition được bảo toàn (đây là
+    dữ liệu compositional, không phải các chuỗi độc lập).
+  </p>
+</div>
+
+<h3>13.7 Hai lưới BH-FDR &amp; năm nhãn verdict</h3>
+<table>
+  <tr><th>Lưới</th><th>Thành phần</th><th>Vai trò</th></tr>
+  <tr><td><b>adj</b> (chính)</td><td>π-adj ∪ ν-adj trên mọi aspect</td><td><b>Kết quả chính thức của paper</b></td></tr>
+  <tr><td><b>raw</b> (riêng)</td><td>π-raw ∪ ν-raw</td><td>Chỉ để so <b>like-for-like</b> trong injection E3a — không phải kết quả chính</td></tr>
+</table>
+<p>Mỗi entry được ghi <span class="mono">p_fdr</span> + <span class="mono">significant_after_fdr</span>. Verdict được tính riêng cho kênh π (<span class="mono">verdict</span>) và kênh ν (<span class="mono">verdict_val</span>):</p>
+<table>
+  <tr><th>Nhãn</th><th>Điều kiện</th><th>Đọc thế nào</th></tr>
+  <tr><td><b>XU HƯỚNG THẬT</b></td><td>adj sig ∧ raw sig ∧ cùng dấu slope</td><td>Xu hướng tồn tại và không phải artifact thành phần</td></tr>
+  <tr><td><b>GIẢ (do thành phần)</b></td><td>raw sig ∧ ¬adj sig</td><td>Phân tích thô sẽ báo cáo sai — đây là ca Module D loại bỏ</td></tr>
+  <tr><td><b>BỊ CHE, lộ ra sau hiệu chỉnh</b></td><td>adj sig ∧ ¬raw sig</td><td>Tín hiệu thật bị thành phần che — ca Module D <b>phát hiện thêm</b></td></tr>
+  <tr><td><b>ĐẢO DẤU sau hiệu chỉnh</b></td><td>adj sig ∧ raw sig ∧ trái dấu</td><td>Kết luận đảo chiều hoàn toàn (ví dụ AM_FOOD trong probe)</td></tr>
+  <tr><td><b>phẳng</b></td><td>còn lại</td><td>Không kết luận</td></tr>
+</table>
+
+<h3>13.8 Schema output <span class="mono">outputs/drift/drift_results.&lt;cohort&gt;.&lt;level&gt;.json</span></h3>
+<pre>{
+  "config": { …vars(args)… },
+  "periods":    ["2022-03", …],      <span class="c"># trục của nu_*_series  (từ vcell)</span>
+  "pi_periods": ["2022-03", …],      <span class="c"># trục của pi_*_series  (từ cell — chỉ kỳ có complaint)</span>
+  "n_significant_after_fdr": 4,          <span class="c"># đếm theo kênh π-adj</span>
+  "n_significant_valence_fdr": 3,        <span class="c"># đếm theo kênh ν-adj</span>
+  "test_statistic": "ols_trend_t (permutation, null riêng từng chuỗi)",
+  "recall_adjusted": false,              <span class="c"># true CHỈ khi D-a đã implement và áp (§13.2)</span>
+  "results": [
+    { "aspect": "AM_FOOD", "level": "taxonomy_code", "cohort": "corpus",
+      "raw":     {"slope_per_year", "t_stat", "changepoint", "welch_t",
+                  "p_perm",              <span class="c"># kiểm định TREND — khớp t_stat, dùng cho BH-FDR</span>
+                  "p_perm_changepoint",  <span class="c"># kiểm định BƯỚC NHẢY — báo cáo riêng</span>
+                  "p_fdr", "significant_after_fdr"},
+      "adj":     { …như trên… , "slope_ci95": [lo, hi] },     <span class="c"># CI chỉ có khi --n-boot &gt; 0</span>
+      "val_raw": { …hoặc null nếu &lt;12 điểm… },
+      "val_adj": { … },
+      "pi_raw_series":  [...],  "pi_adj_series":  [...],      <span class="c"># share (không phải clr)</span>
+      "nu_raw_series":  [...],  "nu_adj_series":  [...],      <span class="c"># có thể chứa null</span>
+      "verdict": "ĐẢO DẤU sau hiệu chỉnh", "verdict_val": "phẳng" },
+    …
+  ]
+}</pre>
+<p class="sub">
+  Log cuối cùng in một dòng/aspect, sắp theo |t| của π-adj giảm dần — dùng để đọc nhanh mà không cần mở JSON.
+</p>
+
+<h3>13.9 D-a: trạng thái stub <span class="badge todo">CHƯA HOÀN THIỆN</span></h3>
+<div class="item warn">
+  <div class="hd">Bước hiệu chỉnh recall hiện chỉ log, <b>chưa áp vào ước lượng</b></div>
+  <p>
+    Code kiểm tra <span class="mono">outputs/drift/recall_table.json</span>; nếu có thì log
+    <span class="mono">"D-a: áp dụng recall_table.json"</span> và đọc file — <b>nhưng không nhân
+    1/ρ̂ vào cell/vcell</b>. Nếu không có thì log <span class="mono">"D-a: BỎ QUA"</span>.
+    Công thức đích: Ñ<sub>a,t,s</sub> = Σ<sub>ℓ</sub> N<sub>a,t,s,ℓ</sub> / ρ̂<sup>rec</sup>(s, ℓ)
+    với ρ̂ ước lượng từ <b>tập D0</b> (~300 review annotate đầy đủ).
+    <b>Phải hoàn thiện trước run kết quả cuối</b>, và cần bảng recall thật trước đó (chặn bởi annotation).
+  </p>
+</div>
+
+<h3>13.10 Tham số CLI</h3>
+<table>
+  <tr><th>Cờ</th><th class="n">Mặc định</th><th>Ghi chú</th></tr>
+  <tr><td><span class="mono">--quads</span></td><td><b>bắt buộc</b></td><td><span class="mono">quads_weighted.jsonl.gz</span> hoặc <span class="mono">pool_quads.*.jsonl.gz</span></td></tr>
+  <tr><td><span class="mono">--level</span></td><td><span class="mono">taxonomy_code</span></td><td>hoặc <span class="mono">aspect_category</span></td></tr>
+  <tr><td><span class="mono">--cohort</span></td><td><span class="mono">corpus</span></td><td>4 lựa chọn; cần <span class="mono">hotel_cohorts.json</span> nếu ≠ corpus</td></tr>
+  <tr><td><span class="mono">--min-stratum</span></td><td class="n">30</td><td>cường độ shrinkage kênh π</td></tr>
+  <tr><td><span class="mono">--min-valence-w</span></td><td class="n">10</td><td>cường độ shrinkage kênh ν</td></tr>
+  <tr><td><span class="mono">--n-perm</span></td><td class="n">1000</td><td>injection dùng 300 cho tiết kiệm; smoke test dùng 100</td></tr>
+  <tr><td><span class="mono">--n-boot</span></td><td class="n"><b>0</b></td><td><b>0 = tắt.</b> Kết quả cuối phải truyền <span class="mono">--n-boot 1000</span></td></tr>
+  <tr><td><span class="mono">--fdr</span></td><td class="n">0,05</td><td>—</td></tr>
+  <tr><td><span class="mono">--seed</span></td><td class="n">20260821</td><td>dùng cho cả permutation và bootstrap</td></tr>
+  <tr><td><span class="mono">--out</span></td><td>auto</td><td><span class="mono">drift_results.&lt;cohort&gt;.&lt;level&gt;.json</span>; injection dùng cờ này để <b>không ghi đè</b> kết quả chính</td></tr>
+</table>
+
+<h2 class="pb">§14 · Injection &amp; negative control (E3/E4) <span class="badge cpu">CPU</span></h2>
+<p class="sub">
+  <span class="mono">src/prism/eval_injection.py</span> ·
+  <span class="mono">python -m prism.eval_injection --quads &lt;file&gt; --test {composition,valence,shuffle}</span> ·
+  <b>đây là bảng evaluation trung tâm của paper</b>
+</p>
+<p class="lead">
+  Vì <b>không có drift ground truth</b>, ta tạo drift/không-drift <b>có kiểm soát</b> trên chính dữ liệu
+  thật rồi kiểm tra pipeline trả lời đúng. Mỗi injection <b>chỉ đổi đúng một thứ</b>; kết quả ghi vào file
+  riêng (<span class="mono">drift_results.inj_*.json</span> + <span class="mono">injection_&lt;test&gt;.json</span>)
+  và <b>không ghi đè</b> kết quả corpus chính.
+</p>
+
+<h3>14.1 E3a · composition — hiệu chỉnh phải im lặng</h3>
+<table>
+  <tr><th>Bước</th><th>Cài đặt</th></tr>
+  <tr><td>1. Dựng <b>nền null</b></td><td><span class="mono">inject_shuffle</span> <span class="badge new">đã đổi</span>: xáo nhãn <span class="mono">period</span> <b>giữa các <span class="mono">review_uid</span></b> rồi phát xuống mọi quad của cùng review (giữ multiset kỳ mức review và mọi nội dung). Bản cũ shuffle list period rồi <span class="mono">zip</span> theo <b>từng quad</b>, nên hai quad của cùng một review lạc sang hai tháng khác nhau — null chứa những review không tồn tại, và với E4 thì <b>phá tương quan trong review</b> → phương sai chuỗi bị hạ → <b>FPR thực nghiệm bị ước lượng THẤP</b>, negative control PASS quá dễ</td></tr>
+  <tr><td>2. Tiêm đổi thành phần</td><td><span class="mono">inject_composition</span>: theo kỳ, giữ quad với xác suất <span class="mono">keep_p</span> — VN đi từ 1,0 → 0,2; non-VN 0,2 → 1,0 (mô phỏng đúng chiều VN 89,7→16,1%). <b>Resample-with-drop, không sửa nội dung quad nào</b></td></tr>
+  <tr><td>3. Chạy drift</td><td><span class="mono">--level taxonomy_code --cohort corpus --n-perm 300</span>, ghi ra <span class="mono">drift_results.inj_composition.json</span></td></tr>
+  <tr><td>4. Chấm</td><td>Đếm aspect significant sau FDR ở lưới raw (π-raw ∪ ν-raw) và lưới adj (π-adj ∪ ν-adj)</td></tr>
+</table>
+<table>
+  <tr><th>Verdict</th><th>Điều kiện</th><th>Đọc thế nào</th></tr>
+  <tr><td><b>PASS</b></td><td><span class="mono">n_adj == 0</span> ∧ <span class="mono">n_raw ≥ 1</span></td><td>Đúng như thiết kế: thô báo drift giả, adj im lặng</td></tr>
+  <tr><td><b>FAIL</b></td><td><span class="mono">n_adj &gt; 0</span></td><td><b>Hiệu chỉnh hỏng</b> — adj báo drift trên nền null</td></tr>
+  <tr><td><b>INCONCLUSIVE</b></td><td>cả hai = 0</td><td>Injection quá yếu để raw bắt được (mix aspect giữa các strata quá giống nhau) — <b>không nói được gì về adj</b></td></tr>
+</table>
+<div class="item keep">
+  <div class="hd">Hai chi tiết thiết kế dễ làm sai</div>
+  <ul>
+    <li><b>Phải xáo timestamp trước.</b> Dữ liệu thật có thể chứa drift thật; tiêm thẳng lên đó rồi đòi adj im lặng là yêu cầu vô lý.</li>
+    <li><b>Cùng một máy suy diễn cho cả raw và adj</b> (permutation + FDR). So “t-threshold cho raw” với “FDR cho adj” là so táo với cam.</li>
+  </ul>
+</div>
+
+<h3>14.2 E3c · valence — kênh ν phải bắt được</h3>
+<table class="kv">
+  <tr><td>Injection</td><td><span class="mono">inject_valence(quads, aspect, δ, t0, rng)</span>: sau <span class="mono">t0</span>, lật δ% quad <span class="mono">positive → negative</span> của <b>một</b> aspect. <b>Giữ nguyên φ</b> — injection đổi đúng một biến</td></tr>
+  <tr><td>Grid</td><td>δ ∈ {2, 5, 10, 20}% · mặc định <span class="mono">--aspect AM_FOOD --t0 2023-09</span></td></tr>
+  <tr><td>Chấm</td><td>Với từng δ: <span class="mono">val_adj</span> phải significant sau FDR <b>và</b> changepoint nằm trong <b>±3 kỳ</b> của t0 (<span class="mono">within3</span>). Kênh π-adj báo phụ (quad lật vẫn vào kênh π qua điều kiện <span class="mono">sentiment == "negative"</span>)</td></tr>
+  <tr><td>Output</td><td><span class="mono">{"aspect", "t0", "detections": {"2%": {valence_detected_within_3, valence_changepoint, valence_p_fdr, prevalence_detected_within_3, prevalence_p_fdr}, …}}</span></td></tr>
+</table>
+<p class="sub">Đây là chỗ đo <b>minimum detectable effect</b>: δ nhỏ nhất mà ν-adj còn bắt được là con số mô tả độ nhạy của phương pháp.</p>
+
+<h3>14.3 E4 · shuffle — negative control</h3>
+<table class="kv">
+  <tr><td>Injection</td><td>Xáo timestamp toàn bộ, <b>lặp <span class="mono">--repeats</span> lần</b> (mặc định 5) với seed <span class="mono">RANDOM_SEED + i</span></td></tr>
+  <tr><td>Đo</td><td>FPR mỗi lượt = (số test significant) / (số test có <span class="mono">p_fdr</span>) trên lưới <b>π-adj ∪ ν-adj</b>; lấy trung bình</td></tr>
+  <tr><td>Verdict</td><td><b>PASS nếu mean FPR ≤ 2α</b> (= 0,10)</td></tr>
+  <tr><td>Vì sao phải lặp</td><td>Một lần chạy với ~14 aspect có độ phân giải quá thô để ước lượng FPR (bước nhảy nhỏ nhất ≈ 1/28)</td></tr>
+</table>
+<p>Smoke test chạy sẵn E4 trên dữ liệu tổng hợp; run thật cho <b>FPR = 0,0 trên 5 lượt lặp</b>.</p>
+
+<h3>14.4 Probe độc lập</h3>
+<p>
+  <span class="mono">scripts/probe_complaint_composition.py</span> — CACT keyword-probe: đếm lượt nhắc bằng
+  <b>lexicon sinh từ <span class="mono">aspect_term</span> gold + seed thủ công</b> (13 code), chạy trên
+  701.776 review có nội dung “chưa hài lòng”, rồi thực hiện đúng chuỗi standardization → CLR → deseason →
+  OLS. Không bắt buộc trong pipeline; nó là <b>bằng chứng khả thi</b> có trước và độc lập với extractor
+  (§15). Output: <span class="mono">outputs/probe/outputs_cact_probe.pkl</span>.
+</p>
+
+<h2 class="pb">§15 · Bằng chứng đã có — probe CACT</h2>
+<p class="sub">
+  Proxy keyword, 701.776 review “chưa hài lòng”, 36 tháng, <b>chưa dùng ASQP</b>. Slope trên thang CLR mỗi
+  năm, đã khử mùa vụ; |t| &gt; 2,5 coi là có ý nghĩa. ⚠️ Bảng này <b>chưa hiệu chỉnh đa so sánh</b> —
+  dùng để chứng minh khả thi, <b>chưa phải con số để trích vào bài</b>.
+</p>
+
+<h3>15.1 Hiệu chỉnh thành phần đổi kết luận ở 8/13 aspect</h3>
+<table>
+  <tr><th>Aspect</th><th class="n">THÔ slope</th><th class="n">t</th><th class="n">ĐÃ HIỆU CHỈNH</th><th class="n">t</th><th>Kết luận</th></tr>
+  <tr><td><b>AM_FOOD</b></td><td class="n">+0,018</td><td class="n">+1,4</td><td class="n"><b>−0,053</b></td><td class="n"><b>−7,4</b></td><td>bị che + <b>đảo dấu</b></td></tr>
+  <tr><td>SER_SUPPORT</td><td class="n">+0,042</td><td class="n">+3,6</td><td class="n">−0,009</td><td class="n">−1,7</td><td>giả</td></tr>
+  <tr><td><b>FAC_ENV</b></td><td class="n">−0,085</td><td class="n"><b>−4,4</b></td><td class="n">−0,008</td><td class="n">−1,1</td><td><b>giả — 91% artifact</b></td></tr>
+  <tr><td>AM_TRANSPORT</td><td class="n">−0,031</td><td class="n">−4,8</td><td class="n">−0,006</td><td class="n">−0,6</td><td>giả</td></tr>
+  <tr><td>SER_ATTITUDE</td><td class="n">+0,014</td><td class="n">+2,8</td><td class="n">+0,001</td><td class="n">+0,1</td><td>giả</td></tr>
+  <tr><td>FAC_VIEW_LOCATION</td><td class="n">+0,031</td><td class="n">+3,1</td><td class="n">+0,023</td><td class="n">+1,6</td><td>giả</td></tr>
+  <tr><td>FAC_BATH</td><td class="n">−0,002</td><td class="n">−0,4</td><td class="n">+0,022</td><td class="n"><b>+3,4</b></td><td>bị che</td></tr>
+  <tr><td>AM_ROOM_UTIL</td><td class="n">−0,025</td><td class="n">−1,6</td><td class="n">+0,023</td><td class="n">+2,6</td><td>bị che</td></tr>
+  <tr><td><b>AM_WIFI</b></td><td class="n">−0,121</td><td class="n">−6,9</td><td class="n"><b>−0,109</b></td><td class="n"><b>−6,7</b></td><td><b>thật, bền vững</b></td></tr>
+  <tr><td>AM_POOL</td><td class="n">+0,126</td><td class="n">+6,0</td><td class="n">+0,037</td><td class="n">+3,5</td><td>thật (nhỏ hơn 71%)</td></tr>
+  <tr><td>FAC_BUILDING</td><td class="n">+0,048</td><td class="n">+4,3</td><td class="n">+0,016</td><td class="n">+2,8</td><td>thật (nhỏ hơn 67%)</td></tr>
+  <tr><td>FAC_ROOM</td><td class="n">+0,009</td><td class="n">+2,6</td><td class="n">+0,013</td><td class="n">+3,1</td><td>thật</td></tr>
+  <tr><td>FAC_CLIMATE</td><td class="n">−0,024</td><td class="n">−0,9</td><td class="n">+0,053</td><td class="n">+2,1</td><td>đổi dấu, vẫn dưới ngưỡng</td></tr>
+</table>
+<p>
+  <b>5 xu hướng giả bị loại · 3 xu hướng bị che được phát hiện · 4 xu hướng thật được xác nhận.</b><br>
+  Ca sạch nhất — <span class="mono">AM_FOOD</span>: chuỗi thô đi từ 7,67% (2022-03) lên ~10%
+  (t = +1,4 — “không có gì”); chuỗi đã hiệu chỉnh đi từ <b>12,74% xuống ~9,6%</b> (t = <b>−7,4</b>).
+  Đầu 2022 reviewer là 89,7% người Việt và nhóm này phàn nàn về đồ ăn ở tỷ trọng thấp hơn nhóm khác →
+  kéo con số thô xuống một cách giả tạo. Phân tích thô sẽ (i) báo cáo sai rằng
+  <i>“phàn nàn về không gian/tiếng ồn giảm mạnh”</i> và (ii) <b>bỏ sót</b> việc phàn nàn về đồ ăn thật ra
+  đang <b>giảm</b>.
+</p>
+
+<h3>15.2 Xác thực ngoại vi: khôi phục đúng quy luật vật lý</h3>
+<p>Không được cung cấp bất kỳ thông tin nào về mùa, nhưng profile tháng-trong-năm ra đúng như vật lý đòi hỏi:</p>
+<table>
+  <tr><th>Aspect</th><th>Đỉnh</th><th>Đáy</th><th class="n">Đỉnh/đáy</th><th>Hợp lý?</th></tr>
+  <tr><td><b>FAC_CLIMATE</b> (điều hoà)</td><td>T6 — 2,54%</td><td>T1 — 1,15%</td><td class="n"><b>2,22×</b></td><td>✅ đỉnh giữa hè</td></tr>
+  <tr><td><b>AM_POOL</b> (hồ bơi)</td><td>T8 — 4,38%</td><td>T12 — 2,53%</td><td class="n"><b>1,73×</b></td><td>✅ đỉnh mùa bơi</td></tr>
+  <tr><td>FAC_BATH (nước nóng)</td><td>T12 — 9,45%</td><td>T8 — 7,89%</td><td class="n">1,20×</td><td>✅ đỉnh mùa lạnh</td></tr>
+  <tr><td>FAC_ROOM</td><td>T11 — 22,84%</td><td>T6 — 21,67%</td><td class="n"><b>1,05×</b></td><td>✅ đúng là <b>không</b> có mùa</td></tr>
+  <tr><td>AM_WIFI</td><td>T3 — 1,73%</td><td>T1 — 1,36%</td><td class="n">1,27×</td><td>trung tính</td></tr>
+</table>
+<p>
+  Đây là <b>bằng chứng validity mạnh nhất có được khi không có gold drift</b>: phương pháp tái tạo đúng
+  chu kỳ đã biết trước, và cho <b>null phẳng đúng chỗ cần phẳng</b> (FAC_ROOM 1,05× — nếu FAC_ROOM cũng
+  “có mùa” thì đó là dấu hiệu pipeline hỏng). Nó cũng chứng minh khử mùa vụ là <b>bắt buộc</b>: biên độ
+  mùa của điều hoà/hồ bơi lớn gấp ~4× các aspect khác — không khử thì một cửa sổ so sánh đặt lệch mùa sẽ
+  tự sinh ra “drift”.
+</p>
+
+<h3>15.3 ASQP thêm được gì so với keyword probe</h3>
+<ol>
+  <li><b>Trọng số tin cậy</b>: đếm Σw<sub>q</sub> thay vì đếm 1.</li>
+  <li><b>Kênh ν thật</b>: keyword chỉ biết “đoạn này nằm trong ô negative”; ASQP cho cực tính ở mức quad → xử lý được 21,7% ca nội dung tích cực nằm trong ô negative.</li>
+  <li><b>Kênh opinion E<sub>a,t</sub></b> (centroid embedding của opinion): phát hiện <i>“vẫn chê, nhưng lý do đổi”</i> — keyword mù hoàn toàn với việc này. <span class="badge todo">chưa cài</span></li>
+  <li><b>Subcategory + aspect implicit</b>: keyword không bắt được aspect ẩn (3,3% gold).</li>
+</ol>
+<p class="sub">
+  Hệ quả về thứ tự công việc: khung phân tích thời gian <b>đã kiểm chứng xong</b> — nên xây extractor để
+  <i>nâng cấp</i> một pipeline đang chạy, thay vì xây extractor rồi mới hy vọng phần phân tích hoạt động.
+</p>
+
+<h2 class="pb">§16 · Giao thức đánh giá, ablation, baseline, rủi ro</h2>
+
+<h3>16.1 Bảng thí nghiệm E1–E11</h3>
+<table>
+  <tr><th>ID</th><th>Thí nghiệm</th><th>Đo cái gì</th><th>Có gold?</th><th>Ưu tiên</th><th>Trạng thái</th></tr>
+  <tr><td><b>E1</b></td><td>Extraction F1 exact-match quad trên test 1.890 segment</td><td>Chất lượng extractor</td><td>✅</td><td><span class="badge p1">P1</span></td><td><span class="badge todo">cần chạy</span></td></tr>
+  <tr><td>E1b</td><td>F1 tách theo ngôn ngữ / độ dài / cực tính (mức quad)</td><td>Nguồn của D-a</td><td>✅</td><td><span class="badge p1">P1</span></td><td><span class="badge todo">cần chạy</span></td></tr>
+  <tr><td>E1c</td><td>Chronological probe (train ≤2024-06 / test ≥2024-07)</td><td>Temporal generalization</td><td>✅</td><td><span class="badge p1">P1</span></td><td><span class="badge todo">dữ liệu đã có</span></td></tr>
+  <tr><td><b>E2</b></td><td>AUC verifier + ΔAUC + r̂ ↔ human audit + IPW</td><td><b>Module C sống hay chết</b></td><td>bán phần</td><td><span class="badge p1">go/no-go</span></td><td><span class="badge todo">chưa chạy</span></td></tr>
+  <tr><td><b>E3a</b></td><td>Injection composition trên nền null</td><td>adj im lặng ↔ raw báo</td><td>tổng hợp</td><td><span class="badge p1">lõi</span></td><td><span class="badge done">đã cài</span></td></tr>
+  <tr><td>E3b</td><td>Injection length/recall (kéo dài văn bản theo xu hướng thật 27,5→40,8 từ)</td><td>Như trên, cho D-a</td><td>tổng hợp</td><td><span class="badge p1">lõi</span></td><td><span class="badge todo">chưa cài</span></td></tr>
+  <tr><td>E3c</td><td>Injection valence δ ∈ {2,5,10,20}%</td><td>Minimum detectable effect</td><td>tổng hợp</td><td><span class="badge p1">P1</span></td><td><span class="badge done">đã cài</span></td></tr>
+  <tr><td><b>E4</b></td><td>Negative control — xáo timestamp × 5 seed</td><td>FPR thực nghiệm sau FDR</td><td>✅</td><td><span class="badge p1">P1</span></td><td><span class="badge done">FPR = 0,0</span></td></tr>
+  <tr><td>E5</td><td>Cohort train-hotel vs test-hotel (2.381 vs 514)</td><td>Mức lạc quan hoá của pseudo-label</td><td>✅</td><td><span class="badge p2">P2</span></td><td><span class="badge done">cohort đã có</span></td></tr>
+  <tr><td>E6</td><td>Bootstrap stability (resample trong strata)</td><td>CI + độ bền changepoint</td><td>✅</td><td><span class="badge p2">P2</span></td><td><span class="badge done">đã cài</span></td></tr>
+  <tr><td>E7</td><td>Cross-model consistency (đổi backbone/seed)</td><td>Spearman giữa 2 bảng xếp hạng drift</td><td>✅</td><td><span class="badge p2">P2</span></td><td><span class="badge todo">chưa</span></td></tr>
+  <tr><td>E8</td><td>Rating external check (<b>held-out, dùng một lần</b>)</td><td>Spearman kỳ vọng <b>0,3–0,7</b>, chốt trước</td><td>weak</td><td><span class="badge p2">P2</span></td><td><span class="badge todo">chưa</span></td></tr>
+  <tr><td>E9</td><td>Seasonality sanity check</td><td>CLIMATE 2,22× · POOL 1,73× · ROOM 1,05×</td><td>vật lý</td><td><span class="badge done">xong</span></td><td><span class="badge done">PASS</span></td></tr>
+  <tr><td>E10</td><td>Event probe quanh 15/03/2022 (VN mở cửa du lịch)</td><td>Bằng chứng bổ trợ</td><td>⚠ trùng confounder</td><td><span class="badge p3">P3</span></td><td><span class="badge todo">chưa</span></td></tr>
+  <tr><td>E11</td><td>Human temporal micro-benchmark (~400 review, mẫu tách biệt)</td><td>Chiều + độ lớn drift</td><td>✅</td><td><span class="badge p2">P2</span></td><td><span class="badge todo">chưa</span></td></tr>
+</table>
+
+<h3>16.2 Ablation bắt buộc</h3>
+<table>
+  <tr><th>Ablation</th><th>Chứng minh điều gì</th><th>Trạng thái</th></tr>
+  <tr><td><b>− composition adjustment (D-b)</b></td><td>Giá trị lõi của Module D</td><td><span class="badge done">đã có: 8/13 aspect đổi kết luận</span></td></tr>
+  <tr><td>− recall adjustment (D-a)</td><td>Xu hướng giả do độ dài trôi</td><td><span class="badge todo">chặn bởi D0</span></td></tr>
+  <tr><td>− CLR (hồi quy thô trên share)</td><td>Tương quan âm giả do ràng buộc simplex</td><td><span class="badge todo">dễ chạy</span></td></tr>
+  <tr><td>− deseasonalization</td><td>Biên độ mùa CLIMATE/POOL gấp ~4×</td><td><span class="badge done">đã có bằng chứng</span></td></tr>
+  <tr><td>− cross-modal reliability (C)</td><td>Giá trị của Module C</td><td><span class="badge todo">sau E2</span></td></tr>
+  <tr><td>− provenance prior (B)</td><td>Giá trị của weak supervision đặc thù</td><td><span class="badge todo">dễ chạy (λ=1)</span></td></tr>
+  <tr><td>− reliability weighting (w ≡ 1)</td><td>Uncertainty-aware aggregation có đáng công không</td><td><span class="badge todo">dễ chạy</span></td></tr>
+  <tr><td>− self-training (chỉ gold)</td><td>Giá trị của scaling</td><td><span class="badge todo">—</span></td></tr>
+  <tr><td>Strata 20 ô vs 60 ô (<span class="mono">USE_LENGTH_IN_STRATA=True</span>)</td><td>Robustness của hiệu chỉnh</td><td><span class="badge todo">1 cờ config</span></td></tr>
+  <tr><td>Tháng vs quý</td><td>Độ nhạy với lựa chọn thiết kế</td><td><span class="badge todo">—</span></td></tr>
+</table>
+
+<h3>16.3 Baseline phải thắng</h3>
+<table>
+  <tr><th>Nhóm</th><th>Baseline</th><th>Vì sao bắt buộc</th></tr>
+  <tr><td rowspan="4">Extraction</td><td>Generative ASQP fine-tune, <b>không</b> self-training</td><td>số tham chiếu</td></tr>
+  <tr><td><b>Self-training vanilla</b> (chỉ lọc confidence)</td><td><b>baseline chính cần thắng</b> — chứng minh giá trị của provenance</td></tr>
+  <tr><td>LLM zero-shot &amp; few-shot</td><td>reviewer 2026 chắc chắn sẽ hỏi</td></tr>
+  <tr><td>Pipeline extract-classify 2 giai đoạn; keyword/lexicon</td><td>sàn dưới</td></tr>
+  <tr><td rowspan="5">Drift</td><td><b>Document-level rating trend</b> (không dùng ABSA)</td><td><b>quan trọng nhất</b> — không thắng thì bài mất lý do tồn tại</td></tr>
+  <tr><td><b>Chính phương pháp nhưng KHÔNG hiệu chỉnh</b></td><td>bằng chứng trực tiếp cho đóng góp D-b</td></tr>
+  <tr><td>Moving average · EWMA · CUSUM · Page-Hinkley</td><td>chuẩn drift detection</td></tr>
+  <tr><td>PELT / Binary segmentation (<span class="mono">ruptures</span>)</td><td>chuẩn changepoint</td></tr>
+  <tr><td>JS / Wasserstein giữa các kỳ; diachronic embedding shift</td><td>baseline cho kênh phân phối &amp; semantic</td></tr>
+</table>
+
+<h3>16.4 Rủi ro &amp; giảm thiểu</h3>
+<table>
+  <tr><th>#</th><th>Rủi ro</th><th>Mức</th><th>Giảm thiểu (ở đâu trong code)</th><th>Trạng thái</th></tr>
+  <tr><td>R1</td><td>Composition drift nhầm thành quality drift</td><td><span class="badge p1">P1</span></td><td>D-b (<span class="mono">shares_by_period</span>/<span class="mono">valence_by_period</span> adjust) + E3a</td><td><span class="badge done">đã giải quyết &amp; chứng minh</span></td></tr>
+  <tr><td>R2</td><td>Leakage gold ⊂ pool</td><td><span class="badge p1">P1</span></td><td>A4 blocklist + skip <span class="mono">in_gold</span> ở infer/selftrain/photos/D0</td><td><span class="badge done">đã cài, 18.475 cờ</span></td></tr>
+  <tr><td>R3</td><td>Recall lệch theo độ dài sinh drift giả</td><td><span class="badge p1">P1</span></td><td>D-a + E3b</td><td><span class="badge todo">chặn bởi D0</span></td></tr>
+  <tr><td>R4</td><td>Circular validation</td><td><span class="badge p1">P1</span></td><td>Quy tắc <b>một-lần-một-phía</b>: <span class="mono">review_score</span> chỉ validate, không bao giờ lọc pseudo-label</td><td><span class="badge done">quy tắc §19.4</span></td></tr>
+  <tr><td>R5</td><td>Module C thất bại</td><td><span class="badge p2">P2</span></td><td>Go/no-go §12.3 + fallback <span class="mono">conf_seq</span></td><td><span class="badge done">đã cài fallback</span></td></tr>
+  <tr><td>R6</td><td>Covariate shift ảnh (gold 100% vs pool 6,24%)</td><td><span class="badge p2">P2</span></td><td>IPW <span class="mono">has_photo</span> + báo cáo bản <span class="mono">bridge_noipw</span></td><td><span class="badge done">đã cài</span></td></tr>
+  <tr><td>R7</td><td>Survivorship bias (hotel/tháng 549→8.535)</td><td><span class="badge p2">P2</span></td><td>Cohort A/B lọc theo mật độ; báo cáo độ nhạy</td><td><span class="badge done">cohort đã có</span></td></tr>
+  <tr><td>R8</td><td>17/31 code không đủ mẫu</td><td><span class="badge p2">P2</span></td><td>Tự gộp lên category trong <span class="mono">load_quads</span></td><td><span class="badge done">đã quyết</span></td></tr>
+  <tr><td>R9</td><td>Extractor yếu trên tiếng Việt</td><td><span class="badge p2">P2</span></td><td>mT5 + <span class="mono">by_language</span> trong E1b; oversample vi</td><td><span class="badge todo">oversample chưa cài</span></td></tr>
+  <tr><td>R10</td><td>Rating tương quan quá cao → bài mất lý do tồn tại</td><td><span class="badge p3">P3</span></td><td>E8 chốt ngưỡng 0,3–0,7 trước khi chạy; case study aspect ngược chiều rating</td><td><span class="badge todo">chưa</span></td></tr>
+  <tr><td>R11</td><td>Lỗi rơi phủ định trong gold (<span class="mono">H10933639_R00009</span>: gold “Nhân viên nhiệt tình”/positive ← gốc “nhân viên <b>không</b> nhiệt tình”)</td><td><span class="badge p3">P3</span></td><td>A9 audit 73 ca (5 ca kiểm thủ công: 4 đúng, 1 sai)</td><td><span class="badge todo">cần chốt tần suất</span></td></tr>
+</table>
+
+<h3>16.5 Tám giới hạn phải khai báo trong paper</h3>
+<ol>
+  <li>Grounding ảnh ở <b>mức review</b>, không phải mức quad (95,6% single-image; 42,6% trải &gt;1 code).</li>
+  <li>Gold <b>100% có ảnh</b> vs pool 6,24% → covariate shift, đã hiệu chỉnh nhưng không triệt tiêu.</li>
+  <li>Gold chỉ phủ <b>26%</b> văn bản gốc; D-a giảm nhẹ nhưng không xoá được hệ quả.</li>
+  <li><b>Không có drift ground truth</b> — bằng chứng đến từ injection + hội tụ nhiều tín hiệu, không phải một con số.</li>
+  <li>Một nền tảng (Booking.com), một quốc gia → khái quát hoá hạn chế.</li>
+  <li><b>Không có <span class="mono">reviewer_id</span></b> → không loại được reviewer lặp.</li>
+  <li>Span 2022-02→2025-03 <b>không chứa cú sốc COVID</b> → thiếu một nguồn validation ngoại sinh mạnh.</li>
+  <li>Implicit aspect chỉ 3,3%, implicit opinion 1,2% → <b>không</b> làm claim về implicit.</li>
+</ol>
+
+<h3>16.6 Vì sao <b>không</b> gộp drift thành một điểm số</h3>
+<p>
+  Đã cân nhắc và <b>loại</b> công thức tổng hợp D = α·D<sub>sent</sub> + β·D<sub>sem</sub> + γ·D<sub>vol</sub>:
+  (i) thứ nguyên không tương thích (JS ∈ [0,1], |Δν| ∈ [0,2], cosine ∈ [0,2], log-ratio không chặn);
+  (ii) α, β, γ <b>không thể hiệu chỉnh</b> vì không có gold drift → hyperparameter tuỳ ý;
+  (iii) gộp lại là <b>vứt bỏ</b> đúng điểm mạnh của bài — khả năng <i>phân biệt</i> các loại drift.
+  Thay bằng: các chiều tách rời, mỗi chiều một p-value riêng, phân loại theo <b>bảng chữ ký</b>
+  (prevalence / valence / semantic → sentiment drift · opinion drift · prevalence drift · emerging issue).
+</p>
+
+<h2 class="pb">§17 · Orchestrator Kaggle — <span class="mono">scripts/kaggle_pipeline.py</span></h2>
+<p class="sub">Gộp toàn bộ <span class="mono">src/prism</span> thành <b>một entrypoint</b>; triết lý: <b>mỗi cell = 1 step</b> để lỗi step nào chỉ hỏng step đó.</p>
+
+<h3>17.1 Danh sách step &amp; sentinel</h3>
+<pre>PIPELINE = ["store","data","train","selftrain","infer","photos",
+            "c_verifier","c_apply_verifier","c_bridge","c_apply","drift"]
+STEPS    = PIPELINE + ["injection", "all"]      <span class="c"># injection KHÔNG nằm trong 'all'</span></pre>
+<p>
+  Với <span class="mono">--step all</span>: chạy tuần tự và <b>BỎ QUA</b> step đã có output, dựa vào
+  <span class="mono">sentinel()</span>; <span class="mono">--force</span> để chạy lại tất cả. Lỗi ở một
+  step → in <span class="mono">"step X LỖI"</span> rồi dừng chuỗi (step đã xong sẽ tự skip ở lần chạy sau).
+</p>
+<table>
+  <tr><th>Step</th><th>File sentinel (có = coi như đã xong)</th></tr>
+  <tr><td><span class="mono">store</span></td><td><span class="mono">outputs/store/reviews.jsonl.gz</span></td></tr>
+  <tr><td><span class="mono">data</span></td><td><span class="mono">outputs/extract/train.t2t.jsonl</span></td></tr>
+  <tr><td><span class="mono">train</span></td><td><span class="mono">models/seed_extractor/model.safetensors</span></td></tr>
+  <tr><td><span class="mono">selftrain</span></td><td><span class="mono">outputs/extract/selftrain_history.json</span></td></tr>
+  <tr><td><span class="mono">infer</span></td><td><span class="mono">outputs/extract/pool_quads.&lt;cohort&gt;.jsonl.gz</span></td></tr>
+  <tr><td><span class="mono">photos</span></td><td><span class="mono">outputs/reliability/pool_image_index.json</span></td></tr>
+  <tr><td><span class="mono">c_verifier</span></td><td><span class="mono">outputs/reliability/verifier.pkl</span></td></tr>
+  <tr><td><span class="mono">c_apply_verifier</span></td><td><span class="mono">outputs/reliability/pool_quads_vimg.&lt;cohort&gt;.jsonl.gz</span></td></tr>
+  <tr><td><span class="mono">c_bridge</span></td><td><span class="mono">outputs/reliability/bridge.pkl</span></td></tr>
+  <tr><td><span class="mono">c_apply</span></td><td><span class="mono">outputs/reliability/quads_weighted.jsonl.gz</span></td></tr>
+  <tr><td><span class="mono">drift</span></td><td><span class="mono">outputs/drift/drift_results.&lt;cohort&gt;.&lt;level&gt;.json</span></td></tr>
+</table>
+
+<h3>17.2 Cơ chế tìm &amp; stage input</h3>
+<table>
+  <tr><th>Hàm</th><th>Logic</th><th>Rủi ro</th></tr>
+  <tr><td><span class="mono">clone_repo</span></td><td>Ưu tiên repo có sẵn tại <span class="mono">--repo-dir</span>; nếu không, quét <span class="mono">/kaggle/input|working/**/src/prism/config.py</span>; cuối cùng mới <span class="mono">git clone --depth 1</span></td><td>Không internet + không attach repo → lỗi rõ ràng</td></tr>
+  <tr><td><span class="mono">find_one(name, roots)</span></td><td>Glob đệ quy <span class="mono">&lt;root&gt;/**/&lt;name&gt;</span> khắp <span class="mono">/kaggle/input</span> rồi <span class="mono">/kaggle/working</span>; lấy hit <b>đầu tiên</b></td><td>Trùng tên file giữa nhiều dataset → lấy sai bản</td></tr>
+  <tr><td><span class="mono">find_ckpt(roots)</span></td><td>Thư mục HF hợp lệ = có <span class="mono">model.safetensors</span> + <span class="mono">config.json</span>; xếp hạng theo tuple <span class="mono">("selftrain" ∉ path, "module-b-train" ∉ path, "seed_extractor" ∉ path, len(path))</span></td><td><b>Ưu tiên có thể chọn sai</b> khi attach nhiều ckpt → <b>luôn truyền <span class="mono">--ckpt</span> tay</b></td></tr>
+  <tr><td><span class="mono">find_hamos(roots)</span></td><td>Tìm <span class="mono">**/annotations/quads.jsonl</span> rồi lùi 1–2 cấp để khớp <span class="mono">config._hamos_file</span>; fallback tìm thư mục tên <span class="mono">hamos-mabsa</span></td><td>Không thấy → step <span class="mono">data</span>/<span class="mono">c_verifier</span> báo lỗi rõ</td></tr>
+  <tr><td><span class="mono">_safe_copy</span></td><td>Bỏ qua khi nguồn trùng đích (đã stage từ step trước dưới <span class="mono">/kaggle/working</span>) → tránh <span class="mono">shutil.SameFileError</span></td><td>—</td></tr>
+  <tr><td><span class="mono">prepare_store</span></td><td>Bắt buộc <span class="mono">hotel_cohorts.json</span>; nhận <span class="mono">reviews.jsonl.gz</span> hoặc <b>tự nén</b> <span class="mono">reviews.jsonl</span> → <span class="mono">.gz</span></td><td>—</td></tr>
+</table>
+<p>
+  Env được set trước khi gọi module con: <span class="mono">PRISM_TABSA_ROOT=&lt;repo&gt;</span> ·
+  <span class="mono">PRISM_WORK_DIR=/kaggle/working/outputs</span> ·
+  <span class="mono">PRISM_MODEL_DIR=/kaggle/working/models</span> ·
+  <span class="mono">PYTHONPATH=&lt;repo&gt;/src</span> ·
+  <span class="mono">PRISM_HAMOS_ROOT</span> (nếu tìm thấy) ·
+  <span class="mono">TOKENIZERS_PARALLELISM=false</span> ·
+  <span class="mono">PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True</span>.
+</p>
+
+<h3>17.3 Ghép nối Module C trong orchestrator (đã xử lý sẵn)</h3>
+<pre>c_apply_verifier : --quads outputs/extract/pool_quads.&lt;cohort&gt;.jsonl.gz
+                   --image-index outputs/reliability/pool_image_index.json
+                   --out   outputs/reliability/pool_quads_vimg.&lt;cohort&gt;.jsonl.gz
+c_bridge         : --quads outputs/reliability/pool_quads_vimg.&lt;cohort&gt;.jsonl.gz   <span class="c"># ← BẮT BUỘC file vimg</span>
+                   --audit outputs/reliability/audit_sample_300.jsonl               <span class="c"># MỘT tên duy nhất (config.HUMAN_AUDIT_NAME)</span>
+c_apply          : --quads outputs/extract/pool_quads.&lt;cohort&gt;.jsonl.gz             <span class="c"># ← pool_quads GỐC</span>
+                   --out   outputs/reliability/quads_weighted.jsonl.gz
+drift            : ưu tiên quads_weighted; không có thì fallback pool_quads (w = conf_seq)</pre>
+
+<h3>17.4 Không còn bản vá runtime <span class="badge new">đã đổi</span></h3>
+<p>
+  Orchestrator <b>không còn quyền ghi vào <span class="mono">src/</span></b>. Hai hàm
+  <span class="mono">patch_infer_bug</span> và <span class="mono">patch_selftrain_batch</span> đã bị <b>xoá</b>.
+</p>
+<table>
+  <tr><th>Hàm cũ</th><th>Vì sao bỏ</th><th>Thay bằng</th></tr>
+  <tr>
+    <td><span class="mono">patch_infer_bug</span></td>
+    <td>Needle <span class="mono">s_post != q["sentiment_model"]</span> <b>không còn tồn tại</b> trong source, nên hàm là no-op hoàn toàn — code chết nhưng vẫn có quyền ghi đè file</td>
+    <td>Không cần gì: <span class="mono">module_b_infer</span> vốn đã đúng (dict literal dựng <i>trước</i> <span class="mono">q.update</span>)</td>
+  </tr>
+  <tr>
+    <td><span class="mono">patch_selftrain_batch</span></td>
+    <td>So khớp một needle 2 dòng <b>kèm đúng 24 space thụt lề</b>. Reformat / đổi tên biến → không khớp → <b>không patch, không cảnh báo</b> → self-train gọi infer ở mặc định 32/48 → OOM trên T4 <i>sau khi</i> đã train xong vòng 1</td>
+    <td><span class="mono">module_b_selftrain</span> nay có cờ thật <span class="mono">--batch</span> / <span class="mono">--score-batch</span>, orchestrator truyền thẳng ở step <span class="mono">selftrain</span></td>
+  </tr>
+</table>
+
+<h3>17.5 Chuỗi notebook (<span class="mono">kaggle_notebooks/</span>)</h3>
+<table>
+  <tr><th>Notebook</th><th>Step</th><th>Máy</th><th>Attach (ngoài input gốc)</th></tr>
+  <tr><td><span class="mono">01_store</span></td><td>store</td><td><span class="badge cpu">CPU</span></td><td>raw pool + splits + gold ABSA</td></tr>
+  <tr><td><span class="mono">02_data</span></td><td>data</td><td><span class="badge cpu">CPU</span></td><td>hamos-mabsa + splits</td></tr>
+  <tr><td><span class="mono">03_train</span></td><td>train</td><td><span class="badge gpu">GPU</span></td><td>output 02 (t2t)</td></tr>
+  <tr><td><span class="mono">04_selftrain</span></td><td>selftrain</td><td><span class="badge gpu">GPU</span></td><td>output 03 (ckpt) + t2t + <span class="mono">dev.jsonl</span> + store</td></tr>
+  <tr><td><span class="mono">05_infer</span></td><td>infer</td><td><span class="badge gpu">GPU</span></td><td>output 04 (ckpt student) + store</td></tr>
+  <tr><td><span class="mono">06_photos</span></td><td>photos</td><td><span class="badge cpu">CPU</span>+<span class="badge net">NET</span></td><td>store</td></tr>
+  <tr><td><span class="mono">07_c_verifier</span></td><td>c_verifier</td><td><span class="badge gpu">GPU</span></td><td>hamos-mabsa (+ <span class="mono">pip install open_clip_torch</span>, cần Internet lần đầu để tải weight CLIP)</td></tr>
+  <tr><td><span class="mono">08_c_apply_verifier</span></td><td>c_apply_verifier</td><td><span class="badge gpu">GPU</span></td><td>output 05 + 06 + 07</td></tr>
+  <tr><td><span class="mono">09_c_bridge</span></td><td>c_bridge</td><td><span class="badge cpu">CPU</span></td><td>output 08 (vimg)</td></tr>
+  <tr><td><span class="mono">10_c_apply</span></td><td>c_apply</td><td><span class="badge cpu">CPU</span></td><td>output 05 + 09 (<span class="mono">bridge.pkl</span>)</td></tr>
+  <tr><td><span class="mono">11_drift</span></td><td>drift</td><td><span class="badge cpu">CPU</span></td><td>output 10 (<span class="mono">quads_weighted</span>)</td></tr>
+  <tr><td><span class="mono">00_full_pipeline</span></td><td>all</td><td><span class="badge gpu">GPU</span>+<span class="badge net">NET</span></td><td>tất cả — tự bỏ qua step đã có output</td></tr>
+</table>
+<pre><span class="c"># Cell setup (đầu mỗi notebook)</span>
+!rm -rf /kaggle/working/Prism
+!git clone --depth 1 https://github.com/hotuyen21pt/Prism.git /kaggle/working/Prism
+P = "/kaggle/working/Prism/prism/scripts/kaggle_pipeline.py"
+
+<span class="c"># mỗi cell 1 step</span>
+!python {P} --step train
+!python {P} --step selftrain --cohort B-anchor --infer-batch 2 --infer-score-batch 4 --limit 4000
+!python {P} --step infer --cohort T-unbiased --batch 2 --score-batch 4 \
+        --ckpt /kaggle/input/notebooks/&lt;user&gt;/pipeline-selftrain/models/selftrain_round2
+!python {P} --step photos --cohort T-unbiased
+!python {P} --step c_verifier
+!python {P} --step c_apply_verifier --cohort T-unbiased
+!python {P} --step c_bridge         --cohort T-unbiased
+!python {P} --step c_apply          --cohort T-unbiased
+!python {P} --step drift            --cohort corpus
+
+<span class="c"># HOẶC chạy hết 1 cell (tự skip step đã có output)</span>
+!python {P} --step all --cohort T-unbiased          <span class="c"># thêm --force để chạy lại tất cả</span>
+!python {P} --step all --cohort T-unbiased --limit 100 --epochs 3 --rounds 1   <span class="c"># chạy thử nhanh</span></pre>
+<p class="sub">Sau mỗi notebook GPU: bấm <b>Save Version (Save &amp; Run All)</b> để output được giữ; attach tạm trong editor <b>không</b> lưu vào bản commit.</p>
+
+<h3>17.6 Cạm bẫy vận hành đã gặp thật</h3>
+<div class="item warn">
+  <div class="hd">1 · <span class="mono">infer</span> báo thiếu <span class="mono">hotel_cohorts.json</span></div>
+  <p>Chưa attach output store (Module A) vào notebook infer. Attach dataset store <b>và</b> Save Version.</p>
+</div>
+<div class="item warn">
+  <div class="hd">2 · Auto-detect checkpoint chọn sai</div>
+  <p>
+    Khi attach nhiều checkpoint, <span class="mono">find_ckpt()</span> có thể ưu tiên nhầm thư mục
+    <span class="mono">seed_extractor</span> thay vì <span class="mono">selftrain_round2</span>.
+    <b>Luôn truyền <span class="mono">--ckpt</span> tay tới student cuối.</b>
+  </p>
+</div>
+<div class="item warn">
+  <div class="hd">3 · <span class="mono">photos</span> → <span class="mono">c_*</span> phải cùng session</div>
+  <p><span class="mono">pool_image_index.json</span> chứa đường dẫn tuyệt đối (§11.1).</p>
+</div>
+<div class="item warn">
+  <div class="hd">4 · Không có <span class="mono">hamos-mabsa</span> trên Kaggle</div>
+  <p>
+    Bỏ Module C, chạy thẳng <span class="mono">--step drift --cohort corpus</span> — tự fallback dùng
+    <span class="mono">pool_quads</span> với <span class="mono">w = conf_seq</span>.
+  </p>
+</div>
+<div class="item warn">
+  <div class="hd">5 · Ngân sách phiên</div>
+  <p>
+    Kaggle giới hạn ~9–12 h GPU/phiên; <span class="mono">--step all</span> full thường không đủ →
+    tách notebook 01→11. Bước <span class="mono">train</span>, <span class="mono">data</span>,
+    <span class="mono">store</span> thường chạy local rồi upload output làm dataset.
+  </p>
+</div>
+
+<h2 class="pb">§18 · Môi trường: local · Docker · Kaggle</h2>
+
+<h3>18.1 Phân tầng phụ thuộc</h3>
+<table>
+  <tr><th>Nhóm</th><th>Module cần</th><th>Cài gì</th></tr>
+  <tr><td><b>stdlib thuần</b></td><td>Module A · Module D · <span class="mono">eval_injection</span> · <span class="mono">make_audit_samples</span> · <span class="mono">smoke_test</span> · unit test · Module B-data</td><td><b>không cần gì</b> (Python ≥3.9)</td></tr>
+  <tr><td>Numeric</td><td>Module C (bridge, propensity)</td><td><span class="mono">numpy · scipy · scikit-learn</span></td></tr>
+  <tr><td>Deep learning</td><td>B-train · B-eval · B-infer · B-selftrain</td><td><span class="mono">torch · transformers · sentencepiece · accelerate</span></td></tr>
+  <tr><td>Vision</td><td>C1/C2 verifier</td><td><span class="mono">open_clip_torch · pillow · torchvision</span></td></tr>
+  <tr><td>Tùy chọn</td><td>langid thật (A7) · kênh semantic E<sub>a,t</sub> · tiện ích thống kê</td><td><span class="mono">fasttext-wheel · sentence-transformers · statsmodels</span></td></tr>
+</table>
+<pre><span class="c"># Windows PowerShell</span>
+py -3.9 -m venv .venv;  .\.venv\Scripts\Activate.ps1
+python -m pip install -U pip;  python -m pip install -r requirements.txt
+$env:PRISM_HAMOS_ROOT='C:\path\to\hamos-mabsa'
+$env:PYTHONPATH='src'
+
+python -m unittest discover tests     <span class="c"># ~0,15s · 61 test · không cần dữ liệu/torch</span>
+python -m prism.smoke_test            <span class="c"># ~2 phút trên dữ liệu thật — PHẢI PASS</span></pre>
+
+<h3>18.2 Docker</h3>
+<table>
+  <tr><th>File</th><th>Base</th><th>Cài</th><th>Service / CMD</th></tr>
+  <tr><td><span class="mono">Dockerfile</span></td><td><span class="mono">python:3.12-slim</span></td><td><b>không cài gì</b> (A + B-data chỉ dùng stdlib) → build vài giây</td><td><span class="mono">module-a</span> · <span class="mono">module-b-data</span></td></tr>
+  <tr><td><span class="mono">Dockerfile.torch</span></td><td><span class="mono">python:3.12-slim</span></td><td><span class="mono">torch</span> bản <b>CPU-only</b> (nhẹ hơn ~1 GB so với CUDA) + <span class="mono">transformers sentencepiece accelerate</span></td><td><span class="mono">module-b-infer --cohort T-unbiased</span></td></tr>
+</table>
+<pre><span class="c"># Bắt buộc set trước khi chạy compose</span>
+$env:PRISM_DATA = "C:\...\prism\data\raw"     <span class="c"># phải chứa pool + splits + hotel_absa_labeled.jsonl</span>
+docker compose run --rm module-a
+docker compose run --rm module-b-data
+<span class="c"># kết quả ghi ra ./outputs/ trên host; data/raw mount read-only</span></pre>
+<p class="sub">
+  Cả hai image set <span class="mono">PYTHONPATH=/app/src</span> và
+  <span class="mono">PRISM_TABSA_ROOT=/app</span> tường minh (không dựa vào suy luận
+  <span class="mono">parents[2]</span>). Muốn dùng GPU: đổi index-url của torch sang bản cu121 và thêm
+  <span class="mono">--gpus all</span>.
+</p>
+
+<h3>18.3 Ba biến môi trường hay quên</h3>
+<table>
+  <tr><th>Env</th><th>Khi nào phải set</th><th>Triệu chứng nếu quên</th></tr>
+  <tr><td><span class="mono">PYTHONPATH=src</span></td><td>Mọi lệnh local (repo dùng src-layout, chưa <span class="mono">pip install -e</span>)</td><td><span class="mono">ModuleNotFoundError: prism</span></td></tr>
+  <tr><td><span class="mono">PRISM_HAMOS_ROOT</span></td><td>hamos-mabsa không nằm cạnh repo</td><td>Smoke test dừng ở bước kiểm tra path; B-data/C1 báo thiếu gold</td></tr>
+  <tr><td><span class="mono">PRISM_WORK_DIR</span> / <span class="mono">PRISM_MODEL_DIR</span></td><td>Chạy trên Kaggle hoặc muốn tách output khỏi repo</td><td>Ghi vào <span class="mono">&lt;repo&gt;/outputs</span> (thường vẫn OK, nhưng trên Kaggle sẽ mất khi kết phiên)</td></tr>
+</table>
+
+<h2 class="pb">§19 · Test, bất biến, trạng thái</h2>
+
+<h3>19.1 Unit test — 61 test, stdlib, ~0,15 s</h3>
+<table>
+  <tr><th>File</th><th class="n">Test</th><th>Bất biến được bảo vệ</th></tr>
+  <tr>
+    <td><span class="mono">tests/test_utils.py</span></td><td class="n">15</td>
+    <td>parse ngày (3 định dạng + ngày/tháng không hợp lệ) · parse score dấu phẩy · country_bloc 4 nhánh ·
+        length_bin biên · <b>36 kỳ trong cửa sổ</b> · BH-FDR khớp ví dụ chuẩn + giữ thứ tự input + rỗng ·
+        Welch-t guard n&lt;2 và var=0 · <b>clr tổng = 0</b> + clr chịu được share = 0 · quad_uid ổn định &amp; nhạy với opinion</td>
+  </tr>
+  <tr>
+    <td><span class="mono">tests/test_module_b_data.py</span></td><td class="n">5</td>
+    <td>Round-trip quad explicit · implicit NULL cả aspect &amp; opinion · <b>giữ thứ tự nhiều quad</b> ·
+        <b>loại code lạ và sentiment lạ</b> · chuỗi rỗng/không có quad/thiếu trường → trả list rỗng</td>
+  </tr>
+  <tr>
+    <td><span class="mono">tests/test_module_d.py</span></td><td class="n">12</td>
+    <td>1 stratum: adj ≡ raw · <b>standardization xoá được composition shift</b> (dựng ví dụ VN 75%→25%) ·
+        <b>ô vắng đóng góp share gộp (shrinkage) thay vì tạo bước nhảy</b> · prior rất lớn → shrink về gộp ·
+        ν raw = tỷ lệ gộp · ν adj = trung bình theo tham chiếu · aspect vắng → None ·
+        deseason xoá sạch mùa vụ thuần · OLS khôi phục đúng slope×12 · best_split tìm đúng vị trí bước nhảy ·
+        chuỗi &lt;12 điểm → None · chuỗi phẳng → p_perm &gt; 0,05 (nay là p của kiểm định <b>trend</b>)</td>
+  </tr>
+  <tr>
+    <td><span class="mono">tests/test_injection.py</span></td><td class="n">5</td>
+    <td><b>valence injection chỉ đổi sentiment, không đụng φ</b> · không đổi gì trước t0 / aspect khác ·
+        shuffle bảo toàn multiset kỳ và mọi nội dung · composition chỉ <b>drop</b> chứ không sửa quad
+        (kiểm bằng <span class="mono">id()</span>) · tỷ trọng VN giảm theo thời gian ≥0,3</td>
+  </tr>
+  <tr>
+    <td><span class="mono">tests/test_regressions.py</span> <span class="badge new">mới</span></td><td class="n">24</td>
+    <td>Test <b>chống hồi quy</b> cho các lỗi đã sửa — mỗi cái khoá một lỗi mà trước đây <i>không test nào</i>
+        bắt được:<br>
+        · term chứa <span class="mono">|</span> hoặc <span class="mono">&lt;/quad&gt;</span> <b>round-trip được</b>,
+          và model tự sinh <span class="mono">|</span> thô vẫn parse được (neo vào code + sentiment) — 7 test<br>
+        · <span class="mono">inject_shuffle</span>: <b>mọi quad cùng review ở cùng một kỳ</b> · multiset period
+          mức review được bảo toàn · nội dung nguyên vẹn · tái lập với cùng seed — 4 test<br>
+        · <b>parity <span class="mono">quad_uid</span></b> giữa <span class="mono">make_audit_samples</span> và
+          <span class="mono">module_c</span> (khoá join của go/no-go) — 2 test<br>
+        · <b>parity đặc trưng bridge</b> <span class="mono">fit</span> ↔ <span class="mono">apply</span> +
+          <span class="mono">score=0.0</span> KHÔNG bị biến thành 8,7 — 3 test<br>
+        · <span class="mono">find_ckpt</span> chọn <b>round LỚN NHẤT</b> và ưu tiên
+          <span class="mono">selftrain_history.json</span> · không còn hàm patch source ·
+          <b>sentinel từ chối file rỗng</b> — 5 test<br>
+        · <span class="mono">COHORT_DEFS</span> đủ khoá &amp; Module A không còn literal ngưỡng — 2 test<br>
+        · ảnh HTML/JSON bị từ chối, magic bytes JPEG/PNG/WebP được nhận — 2 test</td>
+  </tr>
+</table>
+
+<h3>19.2 Smoke test — 5 kiểm tra trên dữ liệu thật</h3>
+<div class="item warn">
+  <div class="hd">Smoke test nay ghi vào thư mục RIÊNG <span class="badge new">đã đổi</span></div>
+  <p>
+    Mọi output của smoke nằm dưới <span class="mono">outputs/drift/smoke/</span>. Bản cũ gọi
+    <span class="mono">module_d_drift</span> <b>không truyền <span class="mono">--out</span></b>, nên ghi đè đúng
+    <span class="mono">outputs/drift/drift_results.corpus.taxonomy_code.json</span> — file kết quả chính thức
+    của cohort corpus — bằng 50k pseudo-quad keyword tổng hợp, cùng tên cùng schema, không cảnh báo.
+    <span class="mono">eval_injection</span> nay có <span class="mono">--out-dir</span> cho cùng lý do.
+  </p>
+</div>
+<table>
+  <tr><th>#</th><th>Kiểm tra</th><th>Assert</th></tr>
+  <tr><td>1</td><td>Đường dẫn</td><td>Tồn tại <span class="mono">POOL_JSONL · GOLD_QUADS · GOLD_META · train.jsonl</span></td></tr>
+  <tr><td>2</td><td>Blocklist</td><td>Chạy trên 20k dòng pool đầu; <b><span class="mono">len(hotel_split) == 3399</span></b> (đúng số hotel gold — kỳ vọng đọc từ <span class="mono">tests/expected_counts.json</span> <span class="badge new">đã đổi</span>, gold cập nhật thì sửa file đó chứ không sửa assert); log số leak bắt được (<b>148/20k</b> ở run thật)</td></tr>
+  <tr><td>3</td><td>Module B-data</td><td><b><span class="mono">train+dev+test quads == 23995</span></b> ∧ <b><span class="mono">roundtrip_mismatch == 0</span></b></td></tr>
+  <tr><td>4</td><td>Module D</td><td>Dựng pseudo-quad bằng keyword (5 code) từ 50k review pool, chạy drift <span class="mono">--n-perm 100</span>; assert ≥4 aspect, log số kỳ (<b>36</b>)</td></tr>
+  <tr><td>5</td><td>Negative control</td><td>Chạy <span class="mono">eval_injection --test shuffle</span>; log FPR + verdict (<b>FPR 0,0 → PASS</b>)</td></tr>
+</table>
+<p><b>Nếu smoke test fail thì dừng</b>, không chạy tiếp bất cứ thứ gì.</p>
+
+<h3>19.3 Đường găng chuẩn</h3>
+<pre> 1. unit test + smoke test                       ✅ PASS
+ 2. module_a_store                               ✅ ĐÃ CHẠY (1.921.661 review · 18.475 gold-leak flagged)
+ 3. module_b_data                                ✅ ĐÃ CHẠY (23.995 quad · chrono 7.046/3.665)
+ 3b. make_audit_samples (D0)                     ✅ ĐÃ CHẠY (300 review · 6 ô strata)
+                                                 → GIAO ANNOTATE NGAY (chặn D-a · ~1,5 tuần người)
+ 4. module_b_train                               ✅ seed ĐÃ TRAIN (mt5-small · dev loss 0,1904)
+ 5. module_b_eval (+ chrono probe E1c)           ⬜ chốt bảng F1 tham chiếu   ← việc tiếp theo
+ 6. module_c train_verifier                      ⬜ GO/NO-GO theo ΔAUC — chạy SỚM để biết scope
+ 7. module_b_infer  T-unbiased → B-anchor → corpus (giữ rescore BẬT)
+ 7b. make_audit_samples --quads … (AUDIT 300)    → GIAO ANNOTATE
+ 8. download_pool_photos → c apply_verifier → bridge → apply
+ 9. module_d_drift  (corpus + T-unbiased, --n-boot 1000)
+10. eval_injection composition + valence + shuffle --repeats 5
+11. (tuỳ chọn) module_b_selftrain rồi lặp 7–10 với checkpoint mới</pre>
+
+<h3>19.4 Bảy quy tắc bất biến — vi phạm = kết quả vô hiệu</h3>
+<div class="item keep">
+  <div class="hd">1 · Không bao giờ train/self-train/infer trên dòng <span class="mono">in_gold=true</span></div>
+  <p>Blocklist ở Module A + skip vô điều kiện ở <span class="mono">module_b_infer.units()</span>. Đừng bỏ blocklist khi refactor Module A “cho nhanh”.</p>
+</div>
+<div class="item keep">
+  <div class="hd">2 · <span class="mono">review_score</span> chỉ dùng validate (E8), không bao giờ làm feature lọc pseudo-label</div>
+  <p>Đã đo: polarity field là nhãn sentiment gần-xác-định và <span class="mono">review_score</span> <b>không độc lập</b> với nó (pos-only score TB 9,52 · neg-only 5,33). Dùng cả hai cùng phía = circular validation.</p>
+</div>
+<div class="item keep">
+  <div class="hd">3 · Không dùng temporal consistency làm bộ lọc</div>
+  <p>Nó xoá chính tín hiệu drift cần đo.</p>
+</div>
+<div class="item keep">
+  <div class="hd">4 · Số chính thức = cột <span class="mono">adj</span>/<span class="mono">val_adj</span> <b>sau FDR</b>; luôn báo cáo kèm cột raw</div>
+  <p>Cột raw là bằng chứng minh bạch cho đóng góp D-b, không phải kết quả.</p>
+</div>
+<div class="item keep">
+  <div class="hd">5 · Ngưỡng go/no-go (AUC 0,70 · ΔAUC 0,05 · Spearman 0,30) và ngưỡng E8 (0,3–0,7) chốt <b>trước</b> khi chạy</div>
+  <p>Chống HARKing. Đổi ngưỡng sau khi thấy kết quả phải ghi rõ trong paper là đã đổi.</p>
+</div>
+<div class="item keep">
+  <div class="hd">6 · Kết quả chính thức của B-infer <b>phải</b> chạy với rescore (không <span class="mono">--no-rescore</span>)</div>
+  <p>Không rescore thì posterior thoái hoá thành hàm tất định của (s dự đoán, φ) và λ mất ý nghĩa.</p>
+</div>
+<div class="item keep">
+  <div class="hd">7 · Mọi run ghi kèm <span class="mono">config</span>/<span class="mono">args</span> vào output JSON</div>
+  <p>Không ghi → không tái lập → không dùng được.</p>
+</div>
+<p><b>Bất biến vận hành bổ sung:</b></p>
+<ul>
+  <li><b>Idempotency:</b> <span class="mono">photos</span> và <span class="mono">--step all</span> bỏ qua việc đã xong; muốn chạy lại phải <span class="mono">--force</span> hoặc xoá output.</li>
+  <li><b>Thứ tự <span class="mono">selftrain → infer</span>:</b> pool_quads sinh bằng seed teacher chỉ là <b>sơ bộ</b>, phải đè lại bằng student cuối.</li>
+  <li><b>Provenance mềm:</b> không chuyển posterior thành bộ lọc cứng; quad <span class="mono">provenance_flip</span> vẫn giữ để audit.</li>
+  <li><b>Hai mẫu annotation tách biệt:</b> D0 (recall) ≠ AUDIT (precision) — trộn là circular.</li>
+</ul>
+
+<h3>19.5 Trạng thái &amp; việc còn thiếu (theo mức độ chặn)</h3>
+<table>
+  <tr><th>#</th><th>Việc</th><th>Chặn cái gì</th><th>Ưu tiên</th></tr>
+  <tr><td>1</td><td><b>Annotate D0 300 review</b> (điền <span class="mono">gold_quads</span>) → dựng <span class="mono">outputs/drift/recall_table.json</span></td><td>D-a (hiệu chỉnh recall) và ablation −D-a</td><td><span class="badge p1">P1</span></td></tr>
+  <tr><td>2</td><td><b>Hoàn thiện bước áp <span class="mono">recall_table</span></b> trong <span class="mono">module_d_drift</span> (hiện là stub chỉ log)</td><td>Kết quả cuối của Module D</td><td><span class="badge p1">P1</span></td></tr>
+  <tr><td>3</td><td>Chạy <b>E1/E1b/E1c</b> (<span class="mono">module_b_eval</span> + chrono probe)</td><td>Bảng F1 tham chiếu — mọi kết luận drift phải hiệu chỉnh mức tự tin theo E1c</td><td><span class="badge p1">P1</span></td></tr>
+  <tr><td>4</td><td>Chạy <b>C1 train_verifier</b> để biết GO/NO-GO</td><td>Scope của bài (Information Fusion vs IP&amp;M/KBS)</td><td><span class="badge p1">P1</span></td></tr>
+  <tr><td>5</td><td><b>Quét λ ∈ {0,5…0,9}</b> trên dev, tối đa dev F1 sentiment</td><td>λ=0,7 hiện là giá trị đặt tay, chưa chọn trên dev</td><td><span class="badge p2">P2</span></td></tr>
+  <tr><td>6</td><td>Annotate <b>AUDIT 300 quad</b> (<span class="mono">correct</span> 0/1)</td><td>Spearman go/no-go của bridge (cần ≥30 cặp khớp)</td><td><span class="badge p2">P2</span></td></tr>
+  <tr><td>7</td><td>Cài <b>E3b</b> (injection length/recall)</td><td>Bằng chứng cho D-a</td><td><span class="badge p2">P2</span></td></tr>
+  <tr><td>8</td><td>Cài <span class="mono">1[span hợp lệ]</span> trong <span class="mono">apply_weights</span></td><td>Công thức w<sub>q</sub> đầy đủ như đặc tả</td><td><span class="badge p2">P2</span></td></tr>
+  <tr><td>9</td><td>Cài <b>A7 langid thật</b> (fasttext) → thêm trường <span class="mono">lang</span> vào store</td><td>Biến kiểm soát ngôn ngữ trong strata/phân tích</td><td><span class="badge p3">P3</span></td></tr>
+  <tr><td>10</td><td>Cài <b>kênh semantic E<sub>a,t</sub></b> (opinion centroid, encoder đóng băng)</td><td>Phát hiện “vẫn chê nhưng lý do đổi” (opinion drift)</td><td><span class="badge p3">P3</span></td></tr>
+  <tr><td>11</td><td>Chốt tần suất <b>lỗi rơi phủ định</b> trong gold (A9: 73 ca, 5 ca kiểm tay: 4 đúng / 1 sai)</td><td>Khai báo giới hạn dữ liệu</td><td><span class="badge p3">P3</span></td></tr>
+</table>
+
+<h2 class="pb">Phụ lục A · Chỉ mục CLI đầy đủ</h2>
+<pre><span class="c">########## Kiểm tra trước tiên ##########</span>
+$env:PYTHONPATH='src'
+python -m unittest discover tests
+python -m prism.smoke_test
+
+<span class="c">########## Module A ##########</span>
+python -m prism.module_a_store                       <span class="c"># không có cờ CLI</span>
+
+<span class="c">########## Module B ##########</span>
+python -m prism.module_b_data                        <span class="c"># không có cờ CLI</span>
+
+python -m prism.module_b_train \
+   [--model google/mt5-base] [--epochs 10] [--batch 8] [--grad-accum 4] [--lr 3e-4] \
+   [--max-src 160] [--max-tgt 192] [--seed 20260821] \
+   [--train-file outputs/extract/train.t2t.jsonl] [--dev-file outputs/extract/dev.t2t.jsonl] \
+   [--out models/seed_extractor]
+
+python -m prism.module_b_eval \
+   [--ckpt models/seed_extractor] [--test-file outputs/extract/test.t2t.jsonl] \
+   [--gold-file data/raw/test.jsonl] [--batch 16] [--max-tgt 192] \
+   [--out-prefix outputs/extract/eval]
+
+python -m prism.module_b_selftrain \
+   [--rounds 2] [--cohort B-anchor] [--tau 0.7] [--tau-post 0.8] \
+   [--max-ratio 3.0] [--max-skew 0.10] [--infer-limit 200000] \n   [--empty-ratio 0.1] [--batch 32] [--score-batch 48]
+
+python -m prism.module_b_infer \
+   [--ckpt models/seed_extractor] [--cohort T-unbiased|A-dense|B-anchor|corpus] \
+   [--batch 32] [--score-batch 48] [--lam 0.7] [--no-rescore] \n   [--limit 0] [--sample-seed 20260821]
+
+<span class="c">########## Ảnh + mẫu annotation ##########</span>
+python scripts/download_pool_photos.py \
+   [--cohort T-unbiased] [--limit 0] [--sleep 0.4] [--timeout 15]
+
+python -m prism.make_audit_samples [--quads &lt;pool_quads.*.jsonl.gz&gt;] [--n 300] [--seed 20260821]
+
+<span class="c">########## Module C (4 stage, đúng thứ tự) ##########</span>
+python -m prism.module_c_reliability --stage train_verifier
+python -m prism.module_c_reliability --stage apply_verifier \
+   --quads outputs/extract/pool_quads.&lt;cohort&gt;.jsonl.gz \
+   --image-index outputs/reliability/pool_image_index.json \
+   --out outputs/reliability/pool_quads_vimg.&lt;cohort&gt;.jsonl.gz
+python -m prism.module_c_reliability --stage bridge \
+   --quads outputs/reliability/pool_quads_vimg.&lt;cohort&gt;.jsonl.gz \
+   --audit outputs/reliability/audit_sample_300.jsonl
+python -m prism.module_c_reliability --stage apply \
+   --quads outputs/extract/pool_quads.&lt;cohort&gt;.jsonl.gz \
+   --out outputs/reliability/quads_weighted.jsonl.gz
+
+<span class="c">########## Module D (kết quả cuối) ##########</span>
+python -m prism.module_d_drift --quads outputs/reliability/quads_weighted.jsonl.gz \
+   [--level taxonomy_code|aspect_category] [--cohort corpus] \
+   [--min-stratum 30] [--min-valence-w 10] [--n-perm 1000] [--n-boot 1000] \
+   [--fdr 0.05] [--seed 20260821] [--out &lt;path&gt;] [--final]
+
+<span class="c">########## Robustness ##########</span>
+python -m prism.eval_injection --quads &lt;file&gt; --test composition [--n-perm 300] [--out-dir &lt;dir&gt;]
+python -m prism.eval_injection --quads &lt;file&gt; --test valence [--aspect AM_FOOD] [--t0 2023-09]
+python -m prism.eval_injection --quads &lt;file&gt; --test shuffle  [--repeats 5]
+
+<span class="c">########## Orchestrator Kaggle ##########</span>
+python scripts/kaggle_pipeline.py --step &lt;step|all&gt; \
+   [--repo-url …] [--repo-dir /kaggle/working/Prism] \
+   [--work-dir /kaggle/working/outputs] [--model-dir /kaggle/working/models] \
+   [--cohort T-unbiased] [--ckpt &lt;dir&gt;] [--limit 0] [--model google/mt5-small] \
+   [--epochs 10] [--batch 2] [--score-batch 4] [--grad-accum 8] [--rounds 2] \
+   [--infer-batch 2] [--infer-score-batch 4] [--level taxonomy_code] \
+   [--test composition] [--force]</pre>
+
+<h2>Phụ lục B · Bản đồ file toàn repo</h2>
+<table>
+  <tr><th>Đường dẫn</th><th>Nhiệm vụ</th></tr>
+  <tr><td><span class="mono">README.md</span></td><td>Cửa vào: cấu trúc repo, quick start, chuỗi Kaggle, danh mục tài liệu phương pháp</td></tr>
+  <tr><td><span class="mono">pyproject.toml</span></td><td>Packaging src-layout (<span class="mono">prism-tabsa</span> 0.1.0, requires-python ≥3.9, <b>dependencies rỗng</b>) + cấu hình pytest (<span class="mono">testpaths=tests</span>, <span class="mono">pythonpath=src</span>)</td></tr>
+  <tr><td><span class="mono">requirements.txt</span></td><td>Deps nặng phân nhóm theo module, có ghi chú nhóm nào cần cho gì</td></tr>
+  <tr><td><span class="mono">.gitignore</span></td><td>Loại <span class="mono">/outputs/</span>, <span class="mono">/models/*</span>, <span class="mono">/data/raw/*.jsonl</span> — <b>dữ liệu và checkpoint không commit</b></td></tr>
+  <tr><td><span class="mono">Dockerfile</span> · <span class="mono">Dockerfile.torch</span> · <span class="mono">docker-compose.yml</span></td><td>§18.2</td></tr>
+  <tr><td><span class="mono">data/README.md</span></td><td>Mô tả 4 file raw + quy tắc blocklist; cảnh báo <span class="mono">hotel_absa_labeled.jsonl</span> <b>không chứa quad</b></td></tr>
+  <tr><td colspan="2"><b><span class="mono">src/prism/</span></b></td></tr>
+  <tr><td><span class="mono">config.py</span></td><td>§2 — mọi hằng số/ngưỡng</td></tr>
+  <tr><td><span class="mono">utils.py</span></td><td>§4 — I/O, parse VN, strata, CLR, BH-FDR, Welch-t, quad_uid</td></tr>
+  <tr><td><span class="mono">module_a_store.py</span></td><td>§5</td></tr>
+  <tr><td><span class="mono">module_b_data.py</span></td><td>§6 — <span class="mono">linearize</span>/<span class="mono">parse_linearized</span> (dùng lại ở infer &amp; eval)</td></tr>
+  <tr><td><span class="mono">module_b_train.py</span></td><td>§7</td></tr>
+  <tr><td><span class="mono">module_b_eval.py</span></td><td>§8</td></tr>
+  <tr><td><span class="mono">module_b_selftrain.py</span></td><td>§9</td></tr>
+  <tr><td><span class="mono">module_b_infer.py</span></td><td>§10</td></tr>
+  <tr><td><span class="mono">module_c_reliability.py</span></td><td>§12 — 4 stage + <span class="mono">GO_NOGO</span></td></tr>
+  <tr><td><span class="mono">module_d_drift.py</span></td><td>§13</td></tr>
+  <tr><td><span class="mono">eval_injection.py</span></td><td>§14</td></tr>
+  <tr><td><span class="mono">make_audit_samples.py</span></td><td>§11.2</td></tr>
+  <tr><td><span class="mono">smoke_test.py</span></td><td>§19.2</td></tr>
+  <tr><td><span class="mono">README.md</span> (trong package)</td><td>Runbook chi tiết từng bước + changelog audit code 2026-08-22 + 9 mục quy tắc</td></tr>
+  <tr><td colspan="2"><b><span class="mono">scripts/</span></b></td></tr>
+  <tr><td><span class="mono">kaggle_pipeline.py</span></td><td>§17 — orchestrator 1 file, 13 step</td></tr>
+  <tr><td><span class="mono">download_pool_photos.py</span></td><td>§11.1</td></tr>
+  <tr><td><span class="mono">probe_complaint_composition.py</span></td><td>§14.4 — CACT keyword probe (13 code, lexicon từ gold + seed thủ công)</td></tr>
+  <tr><td colspan="2"><b><span class="mono">docs/</span></b></td></tr>
+  <tr><td><span class="mono">method_table_q1.md</span></td><td>Bảng method hợp nhất: module × contribution × novelty × rủi ro; evaluation/ablation/baseline; roadmap; venue</td></tr>
+  <tr><td><span class="mono">method_proposal_q1.md</span></td><td>Lập luận novelty + audit vòng 2 + chọn venue</td></tr>
+  <tr><td><span class="mono">method_spec_aspect_drift.md</span></td><td>Audit dữ liệu đầy đủ (§2 + Phụ lục A), formulation toán, evaluation protocol chi tiết</td></tr>
+  <tr><td><span class="mono">approach_temporal_trend.md</span></td><td>CACT — bằng chứng khả thi cho Module D (§15)</td></tr>
+  <tr><td><span class="mono">pipeline_io.md</span> · <span class="mono">repo_flow.md</span></td><td>Bảng I/O từng step · flow &amp; nhiệm vụ từng file</td></tr>
+  <tr><td><span class="mono">prism_spec.html</span> · <span class="mono">prism_spec.pdf</span></td><td><b>Tài liệu này</b> (HTML là nguồn, PDF là bản in)</td></tr>
+  <tr><td colspan="2"><b><span class="mono">kaggle_notebooks/</span></b> — 01→11 + 00_full_pipeline + README (§17.5) &nbsp;·&nbsp; <b><span class="mono">tests/</span></b> — 6 file, 61 test (§19.1)</td></tr>
+</table>
+
+<h2 class="pb">Phụ lục C · Tra cứu số liệu đã đo</h2>
+<pre>POOL   data/raw/hotel_booking_unlabeled.jsonl
+  1.949.604 review · 10.631 hotel · 2022-02→2025-03 (38 tháng) · 184 null date · 0 dòng JSON lỗi
+  duplicate 15.137 (0,78%)
+  text: both 678.194 (34,8%) · pos-only 444.508 (22,8%) · neg-only 27.713 (1,4%) · none 799.189 (41,0%)
+     → universe text-bearing = 1.150.415 (59,0%)
+  photo 121.584 (6,24%) · stars_rating có ở 89,9%
+  review/hotel: mean 183,4 · median 66 · p90 457 · max 8.599
+  tháng phủ/hotel: mean 19,7 · median 19 · ≥24 tháng: 4.025 hotel · ≥36 tháng: 962 hotel
+  state:   Cặp đôi 40,8% · Gia đình 24,0% · Khách lẻ 18,9% · Nhóm 16,0%
+  country: VN 29,9% · Pháp 6,8% · Úc 6,6% · Đức 6,5% · Anh 6,4%
+  score:   điểm 10 = 44,9% · trung bình theo tháng chỉ dao động 8,47–8,87
+
+GOLD   hamos-mabsa/data/annotations/quads.jsonl
+  23.995 quad · 12.601 segment · 8.796 review · 3.399 hotel · 9.219 ảnh (986 MB) · 38 tháng
+  category(6): FACILITY 55,1 · AMENITY 20,5 · SERVICE 10,7 · EXPERIENCE 8,3 · LOYALTY 3,2 · BRANDING 2,2
+  taxonomy(31): FAC_ROOM 5.444 (22,7%) … BRA_REPUTE 22 (0,09%)   [9 code &lt;100 quad · 17 code &lt;300]
+  sentiment: pos 79,4% · neg 15,4% · neu 5,2% (1.248)
+  implicit: aspect 3,3% (782) · opinion 1,2% (283)
+  quad/review mean 2,73 (max 36) · quad/segment mean 1,90 (max 23) · segment mean 13 từ (max 147)
+  ngôn ngữ: en 7.473 · vi 1.032 · other 205 · đa ngữ 86      → 80,5% en · 16,2% vi
+  split review 6.156/1.320/1.320 · split segment 8.816/1.895/1.890 · hotel 2.381/504/514 (overlap 0)
+  multimodal: 100% quad có primary_image_id · 95,6% review 1 ảnh · 42,6% trải &gt;1 code · 13,3% lẫn cực tính
+
+OVERLAP  gold hotel ⊂ pool: 3.399/3.399 (100%) · pool review thuộc hotel gold: 1.249.424 (64,1%)
+  cohort A (gold ∧ ≥1000): 276 · B (gold ∧ ≥300): 1.221 · C (gold ∧ ≥100): 2.313
+
+CONFOUNDER (đo theo tháng)
+  reviewer VN:  89,7% (2022-03) → 23,0% (2023-03) → 19,7% (2024-03) → 16,1% (2025-01)
+  % có text:    42,1% (2022-02) → 63,4% (2025-03)
+  độ dài TB:    27,5 từ → 40,8 từ
+  hotel/tháng:  549 (2022-02) → 8.535 (2025-02)
+  first-month:  549 hotel bắt đầu 2022-02 · 2.025 hotel bắt đầu 2022-03   (dấu hiệu truncation)
+
+FIELD PROVENANCE (gold n=14.129 quad; mẫu score 400k review)
+  POS → (0,931 / 0,036 / 0,033)      NEG → (0,217 / 0,142 / 0,641)
+  pos-only  n= 88.380  score TB 9,52  median 10  chỉ 1,2% có score ≤6
+  neg-only  n=  5.839  score TB 5,33  median  5     59,0% có score ≤6
+  both      n=137.196  score TB 8,28
+  → polarity field là nhãn sentiment gần-xác-định ⇒ (a) s gần như miễn phí;
+    (b) review_score KHÔNG độc lập với nó ⇒ không được dùng cả hai cùng phía
+
+COVARIATE SHIFT ẢNH (pool có text)
+  có ảnh   n=  114.988  · 56,7 từ · score 8,90
+  không ảnh n=1.035.427 · 36,5 từ · score 8,68
+
+RUN THẬT (2026-08-21 → 2026-09-07)
+  store:  đọc 1.949.604 → ghi 1.921.661 · has_text 1.141.532 · gold-leak flagged 18.475
+          cohort 270 / 1.207 / 514 / 10.629
+  data:   16.789 + 3.600 + 3.606 = 23.995 quad · chrono 7.046 / 3.665 · roundtrip mismatch 0
+  train:  mt5-small · T4 · 10 epoch × ~397 s · best dev loss 0,190413 (epoch 9)
+  smoke:  blocklist 148 leak/20k · 36 kỳ · E4 shuffle FPR 0,0 (5 lượt) · 37 unit test PASS</pre>
+
+<h2>Phụ lục D · Ký hiệu &amp; thuật ngữ</h2>
+<table>
+  <tr><th>Ký hiệu / thuật ngữ</th><th>Nghĩa</th></tr>
+  <tr><td><b>quad</b></td><td>(aspect_term, taxonomy_code, opinion_term, sentiment) + category suy ra từ code</td></tr>
+  <tr><td><b>segment</b></td><td>Đoạn văn bản trong một review — đơn vị extraction của gold</td></tr>
+  <tr><td><b>đơn vị suy luận</b></td><td>Cặp (một ô text của review, φ) — mỗi review pool cho tối đa 2 đơn vị</td></tr>
+  <tr><td><b>φ (phi)</b></td><td><b>Field provenance</b>: ô nguồn của đoạn text — POS (<span class="mono">review_positive</span>) hoặc NEG (<span class="mono">review_negative</span>)</td></tr>
+  <tr><td><b>π<sub>a,t</sub></b></td><td>Share-of-complaints của aspect <i>a</i> ở kỳ <i>t</i> (phân tích trên thang CLR)</td></tr>
+  <tr><td><b>ν<sub>a,t</sub></b></td><td>Negativity rate = P(negative | nhắc <i>a</i>, kỳ <i>t</i>) — <b>estimand trung tâm</b></td></tr>
+  <tr><td><b>E<sub>a,t</sub></b></td><td>Opinion centroid = Σw·ψ(opinion)/Σw với ψ = encoder đóng băng — kênh semantic <span class="badge todo">chưa cài</span></td></tr>
+  <tr><td><b>raw / adj</b></td><td>Bản thô / bản đã direct standardization theo strata</td></tr>
+  <tr><td><b>D-a / D-b</b></td><td>Hiệu chỉnh <b>recall</b> (lỗi đo của công cụ) / hiệu chỉnh <b>thành phần</b> (đổi tổng thể)</td></tr>
+  <tr><td><b>stratum</b></td><td>Ô phân tầng = (country_bloc, traveller_type) → 20 ô; +length_bin → 60 ô</td></tr>
+  <tr><td><b>cohort</b></td><td>Nhóm hotel dùng để lọc phân tích: A-dense · B-anchor · T-unbiased · corpus</td></tr>
+  <tr><td><b>CLR</b></td><td>Centered log-ratio — biến đổi bắt buộc cho dữ liệu compositional</td></tr>
+  <tr><td><b>BH-FDR</b></td><td>Benjamini–Hochberg false discovery rate, α = 0,05</td></tr>
+  <tr><td><b>conf_seq</b></td><td>exp(trung bình log-prob token) của chuỗi target đã sinh</td></tr>
+  <tr><td><b>p_posterior</b></td><td>Xác suất hậu nghiệm của sentiment thắng sau khi kết hợp P<sub>model</sub> với prior φ</td></tr>
+  <tr><td><b>provenance_flip</b></td><td>Cờ: posterior đổi sentiment so với model → nhóm giàu mỉa mai/phủ định, <b>giữ để audit</b></td></tr>
+  <tr><td><b>v_image</b></td><td>Điểm verifier V(ảnh, category) ∈ [0,1] cho quad thuộc review có ảnh</td></tr>
+  <tr><td><b>r̂(q)</b></td><td>Đầu ra bridge: xác suất dự đoán V=1 từ đặc trưng <b>chỉ-text</b></td></tr>
+  <tr><td><b>w<sub>q</sub></b></td><td>Trọng số tin cậy cuối của quad = 1[tax hợp lệ] · (1[span hợp lệ]) · r̂(q)</td></tr>
+  <tr><td><b>go/no-go</b></td><td>Điểm quyết định cuối Module C: trượt ngưỡng → bỏ C, lùi về A+B+D</td></tr>
+  <tr><td><b>HARKing</b></td><td>Đặt giả thuyết sau khi biết kết quả — chống bằng cách chốt mọi ngưỡng trước khi chạy</td></tr>
+  <tr><td><b>IPW</b></td><td>Inverse propensity weighting — hiệu chỉnh covariate shift theo <span class="mono">has_photo</span></td></tr>
+</table>
+
+<p class="foot">
+  <b>PRISM — Đặc tả pipeline (bản chi tiết).</b>
+  Nguồn: <span class="mono">src/prism/*.py</span> · <span class="mono">scripts/*.py</span> ·
+  <span class="mono">tests/*.py</span> · <span class="mono">kaggle_notebooks/</span> ·
+  <span class="mono">docs/{pipeline_io, repo_flow, method_table_q1, method_spec_aspect_drift, approach_temporal_trend}.md</span> ·
+  <span class="mono">outputs/store/store_report.json</span> ·
+  <span class="mono">outputs/extract/data_report.json</span> ·
+  <span class="mono">models/seed_extractor/training_log.json</span> ·
+  <span class="mono">Dockerfile*</span> · <span class="mono">docker-compose.yml</span>.<br>
+  Commit gốc <span class="mono">fc5c774</span> (2026-09-07). Mọi vị trí được trích theo <b>tên module/hàm</b>,
+  không dùng số dòng. Số liệu <span class="mono">[đo]</span> lấy từ audit dữ liệu và report của các run thật;
+  ô <span class="badge todo">chưa cài</span>/<span class="badge p2">LỆCH</span> phản ánh đúng trạng thái code
+  tại commit này. Tái tạo bản PDF này:
+  <span class="mono">chrome --headless=new --no-pdf-header-footer --print-to-pdf=docs/prism_spec.pdf docs/prism_spec.html</span>.
+</p>
+
+</body>
+</html>

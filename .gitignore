@@ -1,0 +1,35 @@
+# ============================================================================
+# .gitignore Ở GỐC REPO — file .gitignore trong prism/ không áp cho đường dẫn này.
+# Không có file này, `git add -A` sẽ commit hamos-mabsa.zip (971 MB) +
+# prism/data/raw.zip (207 MB): GitHub chặn file >100 MB nên push fail SAU KHI
+# commit đã hình thành, và phải rewrite history mới bỏ ra được.
+# ============================================================================
+
+# Archive dữ liệu — luôn giữ ngoài git
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# Repo dữ liệu gold nằm cạnh (clone riêng, không phải submodule)
+/hamos-mabsa/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store

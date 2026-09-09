@@ -29,7 +29,9 @@ from __future__ import annotations
 import argparse
 import glob
 import gzip
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -37,8 +39,30 @@ from pathlib import Path
 
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
+# Log/print của script này toàn tiếng Việt. Console Windows mặc định cp1252 nên
+# một dòng có dấu là UnicodeEncodeError -> giết cả run. Ép UTF-8, mất dấu chứ
+# không mất run. (Kaggle vốn UTF-8, nhưng script cũng chạy được ở local.)
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 DEFAULT_REPO = "https://github.com/hotuyen21pt/Prism.git"
 SEARCH_ROOTS = ["/kaggle/input", "/kaggle/working"]
+
+# Tên file phải KHỚP với src/prism/config.py — orchestrator tìm input THEO TÊN,
+# nên lệch tên là FileNotFoundError dù file có đó. Giữ đồng bộ với
+# config.pool_quads_name / vimg_quads_name / HUMAN_AUDIT_NAME.
+def POOL_NAME(cohort: str) -> str:
+    return f"pool_quads.{cohort}.jsonl.gz"
+
+
+def VIMG_NAME(cohort: str) -> str:
+    return f"pool_quads_vimg.{cohort}.jsonl.gz"
+
+
+AUDIT_NAME = "audit_sample_300.jsonl"
 
 # thứ tự chạy khi --step all (injection là tùy chọn, không nằm trong 'all')
 PIPELINE = ["store", "data", "train", "selftrain", "infer", "photos",
@@ -55,39 +79,88 @@ def _existing_repo(*cands: Path) -> Path | None:
     return None
 
 
+def _print_commit(repo: Path) -> None:
+    try:
+        out = subprocess.run(["git", "-C", str(repo.parent), "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, timeout=20)
+        if out.returncode == 0:
+            print("  repo commit:", out.stdout.strip())
+    except Exception:                                # noqa: BLE001
+        pass
+
+
 def clone_repo(url: str, directory: Path) -> Path:
+    """Lấy source prism. CLONE TRƯỚC, chỉ fallback sang repo có sẵn khi clone lỗi.
+
+    Bản cũ ưu tiên bất kỳ repo tìm thấy dưới /kaggle/input, nên một output notebook
+    cũ có thư mục Prism sẽ khiến cả run dùng CODE CŨ — trong khi cell setup ở README
+    vừa clone bản mới về /kaggle/working. Không có log nào nói ra.
+    """
     found = _existing_repo(directory)
     if found:
+        print("dùng repo đã có tại", found)
+        _print_commit(found)
         return found
-    for root in SEARCH_ROOTS:
-        for hit in glob.glob(f"{root}/**/src/prism/config.py", recursive=True):
-            repo = Path(hit).parents[2]
-            print("dùng repo có sẵn:", repo)
-            return repo
+
     directory.parent.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(["git", "clone", "--depth", "1", url, str(directory)], check=True)
+        repo = directory / "prism" if (directory / "prism").is_dir() else directory
+        print("đã clone repo mới ->", repo)
+        _print_commit(repo)
+        return repo
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        raise RuntimeError(
-            "Không lấy được source prism: clone lỗi và không thấy repo dưới "
-            "/kaggle/input. Bật internet hoặc attach output notebook có thư mục Prism."
-        ) from e
-    return directory / "prism" if (directory / "prism").is_dir() else directory
+        print(f"[!] clone lỗi ({e}) — thử tìm repo dưới {SEARCH_ROOTS}")
+
+    for root in SEARCH_ROOTS:
+        for hit in sorted(glob.glob(f"{root}/**/src/prism/config.py", recursive=True)):
+            repo = Path(hit).parents[2]
+            print(f"[!] DÙNG REPO CÓ SẴN (có thể là code CŨ): {repo}")
+            _print_commit(repo)
+            return repo
+    raise RuntimeError(
+        "Không lấy được source prism: clone lỗi và không thấy repo dưới "
+        "/kaggle/input. Bật internet hoặc attach output notebook có thư mục Prism.")
 
 
 # --------------------------------------------------------------------- tìm file
 def find_one(name: str, roots: list[str]) -> str | None:
-    for root in roots:
-        hits = [p for p in glob.glob(f"{root}/**/{name}", recursive=True)
-                if os.path.isfile(p)]
-        if hits:
-            return hits[0]
-    return None
+    """Tìm file theo tên. Ưu tiên /kaggle/working (output step trước trong cùng
+    session) rồi tới file MỚI NHẤT.
+
+    glob(recursive=True) không bảo đảm thứ tự, nên `hits[0]` của bản cũ chọn tuỳ ý.
+    Trên Kaggle rất thường attach cùng lúc dataset store + output notebook trước,
+    và CẢ HAI đều chứa train.t2t.jsonl / dev.jsonl / hotel_cohorts.json — chọn sai
+    là train trên split cũ mà log vẫn in "staged ..." như bình thường.
+    """
+    hits = []
+    for prio, root in enumerate(roots):
+        for p in glob.glob(f"{root}/**/{name}", recursive=True):
+            if os.path.isfile(p):
+                # /kaggle/working đứng trước /kaggle/input; trong cùng root: mới nhất
+                hits.append((0 if root.rstrip("/").endswith("working") else 1,
+                             -os.path.getmtime(p), prio, p))
+    if not hits:
+        return None
+    hits.sort()
+    if len(hits) > 1:
+        print(f"  [!] {len(hits)} bản của {name}, dùng bản đầu:")
+        for _, negmt, _, p in hits[:5]:
+            print(f"      {p}  (mtime {-negmt:.0f})")
+    return hits[0][3]
 
 
 def find_ckpt(roots: list[str]) -> str | None:
     """Thư mục checkpoint HF hợp lệ = có model.safetensors + config.json.
-    Ưu tiên student self-train, rồi output train."""
+
+    Thứ tự ưu tiên: (1) final_ckpt ghi trong selftrain_history.json — đây là
+    checkpoint self-train ĐÃ VƯỢT dev F1 tốt nhất; (2) selftrain_round<N> với N
+    LỚN NHẤT; (3) output train / seed_extractor.
+
+    Bản cũ tie-break bằng len(path) rồi sorted() theo chữ, nên round1 thắng round2
+    khi hai đường dẫn dài bằng nhau -> infer chính thức chạy checkpoint vòng trước,
+    ngược đúng bất biến ghi trong README.
+    """
     dirs = []
     for root in roots:
         for p in glob.glob(f"{root}/**/model.safetensors", recursive=True):
@@ -96,13 +169,40 @@ def find_ckpt(roots: list[str]) -> str | None:
                 dirs.append(d)
     if not dirs:
         return None
+    dirs = sorted(set(dirs))
+
+    # (1) tin selftrain_history.json trước tiên
+    hist = find_one("selftrain_history.json", roots)
+    if hist:
+        try:
+            with open(hist, encoding="utf-8") as f:
+                h = json.load(f)
+            want = os.path.basename(str(h.get("final_ckpt") or ""))
+            for d in dirs:
+                if want and os.path.basename(d) == want:
+                    print(f"  ckpt theo selftrain_history.json: {d} "
+                          f"(dev F1 = {h.get('final_dev_f1')})")
+                    return d
+            if want:
+                print(f"  [!] selftrain_history.json trỏ tới '{want}' nhưng không "
+                      f"thấy thư mục đó trong input — rơi về xếp hạng theo tên")
+        except Exception as e:                       # noqa: BLE001
+            print(f"  [!] không đọc được {hist}: {e}")
 
     def rank(d: str):
-        low = d.lower()
-        return ("selftrain" not in low, "module-b-train" not in low,
-                "seed_extractor" not in low, len(d))
+        low = os.path.basename(d).lower()
+        m = re.search(r"round(\d+)", low)
+        return (
+            "selftrain" not in d.lower(),            # selftrain trước
+            -(int(m.group(1)) if m else -1),         # round LỚN NHẤT trước
+            "module-b-train" not in d.lower(),
+            "seed_extractor" not in d.lower(),
+            -os.path.getmtime(d),                    # mới nhất trước
+        )
 
-    return sorted(set(dirs), key=rank)[0]
+    best = sorted(dirs, key=rank)[0]
+    print(f"  ckpt theo xếp hạng tên/mtime: {best}")
+    return best
 
 
 def find_hamos(roots: list[str]) -> str | None:
@@ -154,30 +254,14 @@ def copy_opt(name: str, dst: Path, roots: list[str]) -> bool:
     return True
 
 
-# ------------------------------------------------------------------------ patch
-def patch_infer_bug(repo: Path) -> None:
-    p = repo / "src" / "prism" / "module_b_infer.py"
-    t = p.read_text(encoding="utf-8")
-    f = t.replace('s_post != q["sentiment_model"]', 's_post != q["sentiment"]')
-    if f != t:
-        p.write_text(f, encoding="utf-8")
-        print("patched module_b_infer.py")
-
-
-def patch_selftrain_batch(repo: Path, batch: int, sbatch: int) -> None:
-    p = repo / "src" / "prism" / "module_b_selftrain.py"
-    t = p.read_text(encoding="utf-8")
-    if "--score-batch" in t:
-        return
-    needle = ('                        "--ckpt", ckpt, "--cohort", args.cohort,\n'
-              '                        "--limit", str(args.infer_limit)], check=True)')
-    repl = ('                        "--ckpt", ckpt, "--cohort", args.cohort,\n'
-            f'                        "--batch", "{batch}", "--score-batch", "{sbatch}",\n'
-            '                        "--limit", str(args.infer_limit)], check=True)')
-    if needle in t:
-        p.write_text(t.replace(needle, repl), encoding="utf-8")
-        print(f"patched selftrain infer batch -> {batch}/{sbatch}")
-
+# KHÔNG có hàm patch source ở đây nữa.
+# Trước đây orchestrator ghi đè src/prism/*.py lúc chạy bằng so khớp chuỗi:
+#   - patch_infer_bug: needle đã không còn tồn tại -> no-op hoàn toàn (code chết
+#     nhưng vẫn có quyền ghi vào src/)
+#   - patch_selftrain_batch: needle là 2 dòng KÈM đúng 24 space thụt lề; reformat
+#     hay đổi tên biến là không khớp -> không patch, KHÔNG cảnh báo -> self-train
+#     gọi infer với default batch 32/48 -> OOM trên T4 sau khi train xong vòng 1.
+# module_b_selftrain nay có --batch/--score-batch thật, truyền thẳng ở step selftrain.
 
 # ------------------------------------------------------------------------ store
 def prepare_store(store_dst: Path, roots: list[str]) -> None:
@@ -212,8 +296,19 @@ def run_script(path: Path, argv: list[str], env: dict) -> None:
 
 
 # ---------------------------------------------------------------- sentinel (all)
+# Ngưỡng "file coi như rỗng": .jsonl.gz rỗng vẫn nặng ~53 byte (header gzip), nên
+# os.path.exists() một mình không đủ. Đã gặp thật: pool_quads.T-unbiased.jsonl.gz
+# tồn tại với 0 dòng -> `--step all` in "[skip] infer: đã có output" rồi chạy
+# Module C/D trên tập rỗng.
+MIN_SENTINEL_BYTES = 200
+
+
+def sentinel_ok(path: Path) -> bool:
+    return path.exists() and path.stat().st_size >= MIN_SENTINEL_BYTES
+
+
 def sentinel(step: str, work: Path, model_dir: Path, cohort: str, level: str) -> Path:
-    pool = f"pool_quads.{cohort}.jsonl.gz"
+    pool = POOL_NAME(cohort)
     return {
         "store":           work / "store" / "reviews.jsonl.gz",
         "data":            work / "extract" / "train.t2t.jsonl",
@@ -222,7 +317,7 @@ def sentinel(step: str, work: Path, model_dir: Path, cohort: str, level: str) ->
         "infer":           work / "extract" / pool,
         "photos":          work / "reliability" / "pool_image_index.json",
         "c_verifier":      work / "reliability" / "verifier.pkl",
-        "c_apply_verifier": work / "reliability" / f"pool_quads_vimg.{cohort}.jsonl.gz",
+        "c_apply_verifier": work / "reliability" / VIMG_NAME(cohort),
         "c_bridge":        work / "reliability" / "bridge.pkl",
         "c_apply":         work / "reliability" / "quads_weighted.jsonl.gz",
         "drift":           work / "drift" / f"drift_results.{cohort}.{level}.json",
@@ -233,8 +328,8 @@ def sentinel(step: str, work: Path, model_dir: Path, cohort: str, level: str) ->
 def do_step(step: str, args, repo: Path, env: dict,
             work: Path, model_dir: Path, roots: list[str], hamos: str | None) -> None:
     raw = repo / "data" / "raw"
-    pool = f"pool_quads.{args.cohort}.jsonl.gz"
-    vimg = f"pool_quads_vimg.{args.cohort}.jsonl.gz"
+    pool = POOL_NAME(args.cohort)
+    vimg = VIMG_NAME(args.cohort)
     reliab = work / "reliability"
     print(f"\n=== STEP: {step} | cohort={args.cohort} ===")
 
@@ -264,7 +359,6 @@ def do_step(step: str, args, repo: Path, env: dict,
                     "--out", str(model_dir / "seed_extractor")], env)
 
     elif step == "selftrain":
-        patch_selftrain_batch(repo, args.infer_batch, args.infer_score_batch)
         copy_in("train.t2t.jsonl", work / "extract" / "train.t2t.jsonl", roots)
         copy_in("dev.t2t.jsonl", work / "extract" / "dev.t2t.jsonl", roots)
         copy_in("dev.jsonl", raw / "dev.jsonl", roots, "gold dev cho eval.")
@@ -281,6 +375,8 @@ def do_step(step: str, args, repo: Path, env: dict,
         print("  seed_extractor =", dst)
         run_module("prism.module_b_selftrain",
                    ["--rounds", str(args.rounds), "--cohort", args.cohort,
+                    "--batch", str(args.infer_batch),
+                    "--score-batch", str(args.infer_score_batch),
                     "--infer-limit", str(args.limit or 200000)], env)
 
     elif step == "infer":
@@ -314,23 +410,27 @@ def do_step(step: str, args, repo: Path, env: dict,
         copy_in("pool_image_index.json", reliab / "pool_image_index.json", roots,
                 "Chạy step 'photos' trước (cùng session để giữ đường dẫn ảnh).")
         run_module("prism.module_c_reliability",
-                   ["--stage", "apply_verifier", "--quads", str(work / "extract" / pool),
+                   ["--stage", "apply_verifier", "--cohort", args.cohort,
+                    "--quads", str(work / "extract" / pool),
                     "--image-index", str(reliab / "pool_image_index.json"),
                     "--out", str(reliab / vimg)], env)
 
     elif step == "c_bridge":
         # bridge CẦN file có v_image = output của apply_verifier (pool_quads_vimg)
         copy_in(vimg, reliab / vimg, roots, "Chạy step 'c_apply_verifier' trước.")
-        copy_opt("audit_sample_300.jsonl", reliab / "human_audit_300.jsonl", roots)
+        # MỘT tên duy nhất cho file audit (config.HUMAN_AUDIT_NAME) — không rename
+        copy_opt(AUDIT_NAME, reliab / AUDIT_NAME, roots)
         run_module("prism.module_c_reliability",
-                   ["--stage", "bridge", "--quads", str(reliab / vimg),
-                    "--audit", str(reliab / "human_audit_300.jsonl")], env)
+                   ["--stage", "bridge", "--cohort", args.cohort,
+                    "--quads", str(reliab / vimg),
+                    "--audit", str(reliab / AUDIT_NAME)], env)
 
     elif step == "c_apply":
         copy_in(pool, work / "extract" / pool, roots, "Chạy step 'infer' trước.")
         copy_in("bridge.pkl", reliab / "bridge.pkl", roots, "Chạy step 'c_bridge' trước.")
         run_module("prism.module_c_reliability",
-                   ["--stage", "apply", "--quads", str(work / "extract" / pool),
+                   ["--stage", "apply", "--cohort", args.cohort,
+                    "--quads", str(work / "extract" / pool),
                     "--out", str(reliab / "quads_weighted.jsonl.gz")], env)
 
     elif step == "drift":
@@ -377,7 +477,6 @@ def main() -> None:
     args = ap.parse_args()
 
     repo = clone_repo(args.repo_url, Path(args.repo_dir))
-    patch_infer_bug(repo)
 
     work = Path(args.work_dir)
     model_dir = Path(args.model_dir)
@@ -403,9 +502,12 @@ def main() -> None:
     print(f"\n########## RUN ALL (cohort={args.cohort}) ##########")
     for step in PIPELINE:
         out = sentinel(step, work, model_dir, args.cohort, args.level)
-        if out.exists() and not args.force:
-            print(f"[skip] {step}: đã có output {out}")
+        if sentinel_ok(out) and not args.force:
+            print(f"[skip] {step}: đã có output {out} ({out.stat().st_size} byte)")
             continue
+        if out.exists():
+            print(f"[rerun] {step}: {out} tồn tại nhưng RỖNG "
+                  f"({out.stat().st_size} byte) -> chạy lại")
         try:
             do_step(step, args, repo, env, work, model_dir, roots, hamos)
         except Exception as e:                       # noqa: BLE001

@@ -1,0 +1,6 @@
+{
+  "_note": "Kỳ vọng của smoke_test trên bộ gold hiện tại. Cập nhật gold thì SỬA FILE NÀY (kèm 1 dòng lý do), đừng sửa assert trong code.",
+  "_source": "outputs/store/store_report.json + outputs/extract/data_report.json, commit 7f5bc5d",
+  "gold_hotels_in_splits": 3399,
+  "total_gold_quads": 23995
+}

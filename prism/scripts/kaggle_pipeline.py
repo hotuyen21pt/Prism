@@ -8,6 +8,12 @@ Thứ tự đầy đủ (bất biến):
     store -> data -> train -> selftrain -> infer -> photos
           -> c_verifier -> c_apply_verifier -> c_bridge -> c_apply -> drift [-> injection]
 
+Chen giữa infer và c_bridge là MỘT bước người (không có trong 'all'):
+    --step audit_sample  -> outputs/reliability/audit_sample_300.jsonl
+    người điền "correct": 0|1 cho 300 quad -> attach lại -> chạy lại c_bridge.
+Không có file đó, c_bridge luôn NO-GO và c_apply chạy fallback w=conf_seq
+(bài lùi về A+B+D) — vẫn ra kết quả, nhưng phải báo cáo đúng là không có Module C.
+
 Chạy 1 step:
     !python /kaggle/working/Prism/prism/scripts/kaggle_pipeline.py --step infer \
         --ckpt /kaggle/input/.../selftrain_round2 --cohort T-unbiased
@@ -67,7 +73,9 @@ AUDIT_NAME = "audit_sample_300.jsonl"
 # thứ tự chạy khi --step all (injection là tùy chọn, không nằm trong 'all')
 PIPELINE = ["store", "data", "train", "selftrain", "infer", "photos",
             "c_verifier", "c_apply_verifier", "c_bridge", "c_apply", "drift"]
-STEPS = PIPELINE + ["injection", "all"]
+# audit_sample KHÔNG nằm trong 'all': nó chỉ sinh template, phần còn lại là
+# công người (annotate 'correct'), không tự động hoá được.
+STEPS = PIPELINE + ["audit_sample", "injection", "all"]
 
 
 # --------------------------------------------------------------------- lấy repo
@@ -335,6 +343,7 @@ def sentinel(step: str, work: Path, model_dir: Path, cohort: str, level: str) ->
         "selftrain":       work / "extract" / "selftrain_history.json",
         "infer":           work / "extract" / pool,
         "photos":          work / "reliability" / "pool_image_index.json",
+        "audit_sample":    work / "reliability" / AUDIT_NAME,
         "c_verifier":      work / "reliability" / "verifier.pkl",
         "c_apply_verifier": work / "reliability" / VIMG_NAME(cohort),
         "c_bridge":        work / "reliability" / "bridge.pkl",
@@ -434,6 +443,17 @@ def do_step(step: str, args, repo: Path, env: dict,
                     "--image-index", str(reliab / "pool_image_index.json"),
                     "--out", str(reliab / vimg)], env)
 
+    elif step == "audit_sample":
+        # §3.6/bước 7b: sinh TEMPLATE 300 quad để người chấm đúng/sai. Không có
+        # file này thì c_bridge NO-GO vĩnh viễn (không chấm được Spearman).
+        # --only audit: D0 (§3.2) là mẫu KHÁC, đọc reviews.jsonl.gz và ghi đè
+        # template đã giao annotate — không được kéo theo.
+        copy_in(pool, work / "extract" / pool, roots, "Chạy step 'infer' trước.")
+        run_module("prism.make_audit_samples",
+                   ["--quads", str(work / "extract" / pool), "--only", "audit"], env)
+        print(f"  -> {reliab / AUDIT_NAME}: GIAO ANNOTATE (điền 'correct': 0|1),"
+              " attach lại rồi chạy lại step 'c_bridge'.")
+
     elif step == "c_bridge":
         # bridge CẦN file có v_image = output của apply_verifier (pool_quads_vimg)
         copy_in(vimg, reliab / vimg, roots, "Chạy step 'c_apply_verifier' trước.")
@@ -446,7 +466,15 @@ def do_step(step: str, args, repo: Path, env: dict,
 
     elif step == "c_apply":
         copy_in(pool, work / "extract" / pool, roots, "Chạy step 'infer' trước.")
-        copy_in("bridge.pkl", reliab / "bridge.pkl", roots, "Chạy step 'c_bridge' trước.")
+        # bridge.pkl là TUỲ CHỌN. c_bridge chỉ ghi ra cái tên này khi verdict=GO;
+        # NO-GO thì nó ghi bridge_NOGO.pkl. Hợp đồng đã ghi trong apply_weights:
+        # thiếu bridge -> w = conf_seq thô + cờ w_source, bài lùi về A+B+D.
+        # Hard-require ở đây làm nhánh đó không bao giờ chạy được và giết luôn
+        # 'all' ngay trước drift.
+        if not copy_opt("bridge.pkl", reliab / "bridge.pkl", roots):
+            print("  ! không có bridge.pkl (Module C NO-GO hoặc chưa chạy c_bridge)"
+                  " -> apply sẽ dùng w=conf_seq thô, w_source=conf_seq."
+                  " KHÔNG được báo cáo đây là kết quả có Module C.")
         run_module("prism.module_c_reliability",
                    ["--stage", "apply", "--cohort", args.cohort,
                     "--quads", str(work / "extract" / pool),

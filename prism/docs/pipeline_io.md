@@ -111,6 +111,10 @@ Resume an toàn: ảnh đã có được bỏ qua.
 ### (kèm) Mẫu audit — `python -m prism.make_audit_samples`
 | **Out** | `outputs/reliability/audit_sample_300.jsonl`, `outputs/reliability/d0_sample_300.jsonl` (dùng ở stage `bridge`) |
 
+`--only {both,d0,audit}`. Dùng `--only audit --quads pool_quads.<cohort>.jsonl.gz`
+khi chỉ cần mẫu AUDIT: D0 đọc `reviews.jsonl.gz` và **ghi đè** template D0 đã giao
+annotate. Trên Kaggle: `kaggle_pipeline.py --step audit_sample`.
+
 ---
 
 ## 7. Module C — Reliability (4 stage, đúng thứ tự)  `[CPU/GPU]`
@@ -126,8 +130,12 @@ python -m prism.module_c_reliability --stage apply         --quads outputs/extra
 |---|---|---|
 | `train_verifier` | gold ảnh (`hamos-mabsa/`) | `outputs/reliability/verifier.pkl`, `verifier_report.json` |
 | `apply_verifier` | `pool_quads.<cohort>`, `pool_image_index.json` | điểm ảnh→category cho quad có ảnh |
-| `bridge` | `pool_quads.<cohort>`, `audit_sample_300.jsonl` | `outputs/reliability/bridge.pkl`, `bridge_report.json` |
-| `apply` | `pool_quads.<cohort>` | `outputs/reliability/quads_weighted.jsonl.gz` (gắn trọng số `w`) |
+| `bridge` | `pool_quads_vimg.<cohort>`, `audit_sample_300.jsonl` | `bridge.pkl` **chỉ khi GO**, ngược lại `bridge_NOGO.pkl`; luôn có `bridge_report.json` |
+| `apply` | `pool_quads.<cohort>`, `bridge.pkl` (tuỳ chọn) | `outputs/reliability/quads_weighted.jsonl.gz` (gắn `w` + `w_source`) |
+
+Thiếu `audit_sample_300.jsonl` (file người annotate) ⇒ `bridge` NO-GO ⇒ `apply`
+chạy fallback `w = conf_seq` thô, `w_source="conf_seq"`. Vẫn ra `quads_weighted`
+để Module D chạy tiếp, nhưng **không được báo cáo đó là kết quả có Module C**.
 
 ---
 

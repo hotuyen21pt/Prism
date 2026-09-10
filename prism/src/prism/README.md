@@ -201,9 +201,13 @@ Dòng `in_gold=true` **tự động bị bỏ qua** (blocklist).
 ### 3.6 Tạo mẫu AUDIT 300 quad (sau khi có pool quads)
 
 ```bash
-python3 -m prism.make_audit_samples --quads outputs/extract/pool_quads.T-unbiased.jsonl.gz
+python3 -m prism.make_audit_samples --only audit     --quads outputs/extract/pool_quads.T-unbiased.jsonl.gz
 # -> outputs/reliability/audit_sample_300.jsonl ; người annotate điền "correct": 0|1
+# trên Kaggle: python scripts/kaggle_pipeline.py --step audit_sample --cohort T-unbiased
 ```
+
+`--only audit` là bắt buộc nếu D0 (§3.2) đã giao annotate: mặc định `both` sẽ
+sinh lại và **ghi đè** `d0_sample_300.jsonl`.
 
 Phân tầng conf_seq(3) × φ(2) × provenance_flip(2). Khoá `quad_uid` sinh bằng
 `utils.quad_uid` — **cùng hàm** mà Module C bridge dùng để đối chiếu (không tự dựng khoá).
@@ -350,7 +354,10 @@ của paper. Injection ghi kết quả drift vào file riêng (`drift_results.in
 5.  module_b_eval  (+ chrono probe E1c) → chốt bảng F1 tham chiếu
 6.  module_c train_verifier        ← GO/NO-GO theo ΔAUC — chạy sớm để biết scope
 7.  module_b_infer --cohort T-unbiased → B-anchor → corpus  (giữ rescore bật)
-7b. make_audit_samples --quads ... (AUDIT 300 quad) → GIAO ANNOTATE
+7b. make_audit_samples --only audit (AUDIT 300 quad) → GIAO ANNOTATE
+                                   (`--step audit_sample`; KHÔNG có trong `--step all`)
+                                   → chưa có file này thì C3 luôn NO-GO và bước 8
+                                     chạy fallback w=conf_seq (bài lùi A+B+D)
 8.  scripts/download_pool_photos + module_c apply_verifier → bridge → apply
 9.  module_d_drift  (corpus + T-unbiased, --n-boot 1000)
 10. eval_injection composition + valence + shuffle --repeats 5

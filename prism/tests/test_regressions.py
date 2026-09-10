@@ -389,3 +389,75 @@ class TestSecondPassFixes(unittest.TestCase):
         src = Path(MC.__file__).read_text(encoding="utf-8")
         self.assertIn("CACHE_MAX", src)
         self.assertIn("popitem(last=False)", src)
+
+
+class TestNoGoDegradesInsteadOfCrashing(unittest.TestCase):
+    """Module C NO-GO phải làm bài LÙI VỀ A+B+D, không giết cả chuỗi 'all'.
+
+    apply_weights (module_c_reliability) đã có sẵn nhánh fallback w=conf_seq khi
+    thiếu/NO-GO bridge.pkl, và chính log của bridge hứa điều đó. Nhưng wrapper
+    Kaggle lại `copy_in("bridge.pkl", ...)` — hard require — nên nhánh fallback
+    KHÔNG BAO GIỜ chạy được: c_apply ném FileNotFoundError, 'all' dừng, drift mất
+    luôn dù drift vốn tự fallback về pool_quads.
+    """
+
+    @staticmethod
+    def _branch(step: str) -> str:
+        src = (Path(__file__).resolve().parents[1]
+               / "scripts" / "kaggle_pipeline.py").read_text(encoding="utf-8")
+        head = f'elif step == "{step}":'
+        body = src.split(head, 1)[1]
+        return body.split("\n    elif step ==", 1)[0]
+
+    def test_c_apply_does_not_hard_require_bridge(self):
+        branch = self._branch("c_apply")
+        self.assertNotIn('copy_in("bridge.pkl"', branch,
+                         "c_apply hard-require bridge.pkl -> chặn mất đường "
+                         "fallback w=conf_seq mà apply_weights đã implement")
+        self.assertIn('copy_opt("bridge.pkl"', branch)
+
+    def test_apply_weights_still_has_the_fallback(self):
+        """Nếu ai đó bỏ fallback trong module thì copy_opt ở trên thành bẫy im lặng."""
+        import prism.module_c_reliability as MC
+        src = Path(MC.__file__).read_text(encoding="utf-8")
+        self.assertIn('q["conf_seq"]      # fallback NO-GO', src)
+        self.assertIn('q["w_source"] = src', src)
+
+
+class TestAuditSampleIsReachable(unittest.TestCase):
+    """Bước 7b (sinh mẫu AUDIT) là cổng duy nhất mở được Module C, nhưng nó không
+    có step nào trong orchestrator — nên trên Kaggle không ai chạy được nó, và
+    c_bridge NO-GO vĩnh viễn. Ngoài ra sinh AUDIT không được kéo theo D0: D0 đọc
+    reviews.jsonl.gz (có thể chưa attach) và ghi đè template đã giao annotate.
+    """
+
+    def test_orchestrator_exposes_the_step(self):
+        path = Path(__file__).resolve().parents[1] / "scripts" / "kaggle_pipeline.py"
+        spec = importlib.util.spec_from_file_location("kaggle_pipeline_audit", path)
+        kp = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(kp)
+        self.assertIn("audit_sample", kp.STEPS)
+
+    def test_audit_only_does_not_touch_d0(self):
+        import tempfile
+        from prism import make_audit_samples as MAS
+        quad = {"review_uid": "H1_20230415_00000042", "phi": "NEG",
+                "taxonomy_code": "FAC_ROOM", "opinion_term": "ồn quá",
+                "conf_seq": 0.9, "p_posterior": 0.88, "n_words": 30,
+                "provenance_flip": False, "sentiment": "negative",
+                "text": "phòng ồn quá"}
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "pool.jsonl"
+            U.write_jsonl(src, [dict(quad, opinion_term=f"ồn {i}") for i in range(50)])
+            d0 = C.RELIAB_DIR / "d0_sample_300.jsonl"
+            before = d0.read_bytes() if d0.exists() else None
+            MAS.main_with_args(["--quads", str(src), "--n", "10", "--only", "audit"])
+            after = d0.read_bytes() if d0.exists() else None
+            self.assertEqual(before, after, "--only audit không được đụng vào D0")
+        out = C.RELIAB_DIR / C.AUDIT_SAMPLE_NAME
+        self.assertTrue(out.exists())
+        rows = list(U.read_jsonl(out))
+        self.assertTrue(rows)
+        self.assertTrue(all(r["correct"] is None for r in rows))
+        self.assertEqual(rows[0]["quad_uid"], U.quad_uid(dict(quad, opinion_term=rows[0]["opinion_term"])))
+        out.unlink()

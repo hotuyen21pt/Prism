@@ -96,18 +96,31 @@ def quad_audit_sample(quad_file, n_total: int, rng: random.Random) -> None:
     log.info("AUDIT: %d quad (%d ô strata) -> %s", min(len(rows), n_total), len(strata), out)
 
 
-def main() -> None:
+def main_with_args(argv=None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--quads", default=None,
                     help="pool_quads.*.jsonl.gz — bỏ trống nếu chỉ cần D0")
     ap.add_argument("--n", type=int, default=300)
     ap.add_argument("--seed", type=int, default=C.RANDOM_SEED)
-    args = ap.parse_args()
+    ap.add_argument("--only", choices=["both", "d0", "audit"], default="both",
+                    help="'audit' = chỉ sinh mẫu AUDIT (§3.6). D0 (§3.2) đọc "
+                         "reviews.jsonl.gz và GHI ĐÈ template đã giao annotate, "
+                         "nên đừng kéo nó theo khi chỉ cần AUDIT.")
+    args = ap.parse_args(argv)
     C.ensure_dirs()
-    rng = random.Random(args.seed)
-    d0_sample(args.n, rng)
-    if args.quads:
-        quad_audit_sample(args.quads, args.n, rng)
+    if args.only in ("both", "d0"):
+        d0_sample(args.n, random.Random(args.seed))
+    if args.only in ("both", "audit"):
+        if not args.quads:
+            ap.error("--only audit cần --quads pool_quads.<cohort>.jsonl.gz")
+        # RNG RIÊNG cho AUDIT: nếu dùng chung stream với D0 thì mẫu AUDIT phụ
+        # thuộc vào việc D0 có chạy cùng lệnh hay không -> cùng --seed cho ra
+        # hai file khác nhau, không tái lập được.
+        quad_audit_sample(args.quads, args.n, random.Random(args.seed + 1))
+
+
+def main() -> None:
+    main_with_args()
 
 
 if __name__ == "__main__":

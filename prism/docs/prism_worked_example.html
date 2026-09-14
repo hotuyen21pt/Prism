@@ -1,0 +1,1282 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>PRISM — Ví dụ xuyên suốt</title>
+<style>
+  @page { size: A4; margin: 13mm 11mm; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Segoe UI","Inter",system-ui,Arial,sans-serif; font-size: 9.9px; line-height: 1.48; color: #1f2430; margin: 0; }
+  h1 { font-size: 21px; margin: 0 0 2px; color: #0f172a; letter-spacing: -.2px; }
+  h2 { font-size: 13.4px; margin: 16px 0 6px; padding: 5px 9px; background: #0f172a; color: #fff; border-radius: 4px; break-after: avoid; }
+  h3 { font-size: 11.4px; margin: 11px 0 3px; color: #0f172a; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 2px; break-after: avoid; }
+  h4 { font-size: 10.2px; margin: 8px 0 2px; color: #334155; break-after: avoid; }
+  p { margin: 3px 0; }
+  .sub { color: #64748b; font-size: 9.3px; margin-bottom: 9px; }
+  .lead { background: #f1f5f9; border-left: 3px solid #0f172a; padding: 7px 10px; border-radius: 3px; margin: 8px 0 6px; }
+  table { border-collapse: collapse; width: 100%; margin: 5px 0 7px; font-size: 9.1px; }
+  th, td { border: 1px solid #d7dee8; padding: 3px 5px; text-align: left; vertical-align: top; }
+  th { background: #eef2f7; font-weight: 600; }
+  td.n, th.n { text-align: right; white-space: nowrap; }
+  td.c, th.c { text-align: center; }
+  code, .mono, pre { font-variant-ligatures: none; font-feature-settings: "liga" 0, "clig" 0, "calt" 0; }
+  code, .mono { font-family: "Cascadia Code","Consolas",monospace; font-size: 9px; background: #f4f6f9; padding: 0 3px; border-radius: 3px; color: #b21e35; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 7px 9px; border-radius: 4px; font-family: "Cascadia Code","Consolas",monospace; font-size: 8.6px; line-height: 1.45; white-space: pre-wrap; margin: 5px 0; break-inside: avoid; }
+  pre .c { color: #94a3b8; }  pre .g { color: #86efac; }  pre .y { color: #fde68a; }
+  .item { margin: 8px 0; padding: 7px 9px; border: 1px solid #e2e8f0; border-radius: 5px; break-inside: avoid; }
+  .item .hd { font-weight: 700; font-size: 10.8px; color: #0f172a; }
+  .badge { display: inline-block; font-size: 8.2px; font-weight: 700; padding: 1px 6px; border-radius: 10px; vertical-align: middle; margin-left: 3px; }
+  .p1 { background: #fee2e2; color: #b91c1c; }
+  .p2 { background: #fef3c7; color: #b45309; }
+  .p3 { background: #e0f2fe; color: #0369a1; }
+  .done { background: #dcfce7; color: #15803d; }
+  .todo { background: #fde68a; color: #92400e; }
+  .cpu { background: #e2e8f0; color: #334155; }
+  .gpu { background: #ede9fe; color: #6d28d9; }
+  .syn { background: #fce7f3; color: #9d174d; }
+  .real { background: #dcfce7; color: #15803d; }
+  .keep { border-left: 3px solid #15803d; background: #f0fdf4; }
+  .warn { border-left: 3px solid #b45309; background: #fffbeb; }
+  .bad  { border-left: 3px solid #b91c1c; background: #fef2f2; }
+  .info { border-left: 3px solid #0369a1; background: #f0f9ff; }
+  .fx { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #475569; padding: 5px 9px; margin: 5px 0; border-radius: 3px; font-family: "Cambria","Georgia",serif; font-size: 10.6px; break-inside: avoid; }
+  .fx .why { font-family: "Segoe UI",system-ui,sans-serif; font-size: 9.1px; color: #475569; display: block; margin-top: 3px; }
+  .calc { font-family: "Cascadia Code","Consolas",monospace; font-size: 8.8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 3px; padding: 5px 8px; margin: 4px 0; white-space: pre-wrap; break-inside: avoid; line-height: 1.5; }
+  .calc b { color: #b21e35; }
+  ul, ol { margin: 3px 0; padding-left: 17px; } li { margin: 1.5px 0; }
+  .toc { columns: 2; column-gap: 18px; font-size: 9.2px; }
+  .toc div { break-inside: avoid; margin: 1px 0; }
+  .toc .g { font-weight: 700; color: #0f172a; margin-top: 5px; }
+  .foot { margin-top: 14px; padding-top: 7px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 8.8px; }
+  .pb { break-before: page; }
+  .nowrap { white-space: nowrap; }
+  .fig { margin: 6px 0 8px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 5px 2px; background:#fff; break-inside: avoid; }
+  .figcap { font-size: 8.6px; color: #64748b; padding: 1px 3px 3px; }
+  .flow { font-family: "Cascadia Code","Consolas",monospace; font-size: 8.5px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; padding:6px 8px; white-space:pre; overflow-x:auto; margin:5px 0; }
+  .hl { background: #fef9c3; padding: 0 2px; border-radius: 2px; }
+  .vd { font-weight: 700; font-size: 8.8px; }
+  .vd-that { color: #15803d; } .vd-gia { color: #b91c1c; } .vd-che { color: #7c3aed; }
+  .vd-dao { color: #c2410c; } .vd-phang { color: #64748b; }
+</style>
+</head>
+<body>
+<h1>PRISM — Ví dụ xuyên suốt (worked example)</h1>
+<p class="sub"><b>Một review đi hết pipeline, tính tay từng con số</b> — kèm một mini-corpus 24 kỳ ×
+2 stratum × 5 aspect chạy qua đúng công thức của Module D.<br>
+Tài liệu bổ trợ cho <span class="mono">docs/prism_spec.pdf</span> · mọi công thức và hằng số trích từ code ở
+commit <span class="mono">fc5c774</span> · biên soạn 2026-09-14.</p>
+<p class="lead">
+<b>Mục đích.</b> <span class="mono">prism_spec.pdf</span> trả lời <i>“pipeline làm gì”</i>. Tài liệu này trả lời
+<i>“con số cụ thể nào đi vào, con số cụ thể nào đi ra, và ở bước đó mô hình <u>học</u> hay <u>tính</u> ra cái gì”</i>.
+Mỗi bước đều có: (1) input thật ở dạng số, (2) công thức đúng như trong code, (3) phép thế số từng dòng,
+(4) output, (5) một câu <b>“bước này học gì”</b>, và (6) <b>hỏng gì nếu bỏ bước này</b>.
+Toàn bộ phần Module D được tính bằng chính các hàm <span class="mono">shares_by_period · valence_by_period ·
+clr · deseason · ols_trend · best_split · permutation_p · benjamini_hochberg</span> sao nguyên văn từ
+<span class="mono">module_d_drift.py</span> và <span class="mono">utils.py</span>.
+</p>
+<div class="item warn">
+<div class="hd">Quy ước về số — đọc trước khi trích bất kỳ con số nào</div>
+<table>
+<tr><th style="width:96px">Nhãn</th><th>Nghĩa</th><th>Ví dụ trong tài liệu này</th></tr>
+<tr><td><span class="badge real">SỐ THẬT</span></td>
+    <td>Đo trực tiếp trên dữ liệu/run thật, chép từ <span class="mono">store_report.json</span>,
+        <span class="mono">config.py</span>, <span class="mono">training_log.json</span>. Trích được vào bài.</td>
+    <td>prior <span class="mono">0,931 / 0,641</span>; λ = 0,7; 1.949.604 dòng pool; 23.995 quad gold;
+        best_dev_loss 0,190413</td></tr>
+<tr><td><span class="badge syn">SỐ MINH HOẠ</span></td>
+    <td>Do tài liệu này <b>tự đặt</b> để phép tính hiện ra bằng tay: log-prob từng token,
+        hệ số hồi quy của verifier/bridge/propensity, và mini-corpus 24 kỳ của Module D.
+        <b>Không được trích vào bài.</b> Công thức áp lên chúng thì đúng nguyên văn code.</td>
+    <td>log P(token) = −0,31; coef bridge = [2,64 · 1,87 · 0,42 · 0,19 · −1,35];
+        w<sub>VN</sub>(2022-03) = 900</td></tr>
+</table>
+<p>Nói cách khác: <b>công thức và hằng số cấu hình là thật; dữ liệu số đưa vào ví dụ là dựng</b>.
+Mini-corpus được dựng có chủ đích để cả 5 nhãn verdict của Module D cùng xuất hiện — đó là điều một
+corpus thật hiếm khi cho trong 5 aspect.</p>
+</div>
+<h2>Mục lục</h2><div class="toc">
+<div class="g">Phần I — Bản đồ</div>
+<div>§0 · Ví dụ gốc: một review thô</div>
+<div>§1 · 11 step: mỗi step học gì / tính gì</div>
+<div class="g">Phần II — Từ review tới quad</div>
+<div>§2 · Module A — store (8 bước, ra 19 trường)</div>
+<div>§3 · Module B-data — linear hoá & parse</div>
+<div>§4 · Module B-train — mô hình học gì</div>
+<div>§5 · Module B-infer — conf_seq · P_model · posterior</div>
+<div>§6 · Module B-selftrain — chọn pseudo & guardrail</div>
+<div class="g">Phần III — Từ quad tới trọng số</div>
+<div>§7 · Module C — verifier · v_image · bridge · IPW · w</div>
+<div class="g">Phần IV — Từ trọng số tới kết luận</div>
+<div>§8 · Module D — toàn bộ máy drift, 24 kỳ</div>
+<div>§9 · Injection E3a / E3c / E4</div>
+<div class="g">Phần V — Tổng kết</div>
+<div>§10 · Bảng “mỗi step học gì” · bỏ step nào thì hỏng gì</div>
+<div>Phụ lục A · mini-corpus đầy đủ</div>
+<div>Phụ lục B · chuỗi π và ν đầy đủ 24 kỳ</div>
+</div>
+<h2>§0 · Ví dụ gốc — một dòng pool thô</h2>
+<p>Mọi con số ở §2–§7 đều bắt nguồn từ đúng một dòng trong
+<span class="mono">data/raw/hotel_booking_unlabeled.jsonl</span>. Dòng này là <b>dòng thứ 417</b> của file
+(chỉ số 0-based 416), thuộc hotel <span class="mono">3977209</span>:</p>
+<pre>{
+  "hotel_id": "3977209",
+  "review_date": "Ngày đánh giá: ngày 5 tháng 9 năm 2023",
+  "review_score": "Đạt điểm 7,5",
+  "review_positive": "Nhân viên nhiệt tình, hồ bơi ổn",
+  "review_negative": "Phòng ồn và đồ ăn sáng tệ",
+  "country": "Việt Nam",
+  "state": "Cặp đôi",
+  "room": "Phòng Deluxe Giường Đôi",
+  "stars_rating": 4.0,
+  "date": "2 đêm · Tháng 9/2023",
+  "name": "Linh",
+  "review_photo": {"https://cf.bstatic.com/xdata/images/.../ph1.jpg": "hồ bơi"},
+  "time_crawl": "2025-03-10"
+}</pre>
+<div class="flow">dòng pool thô
+  │
+  ├─(A) parse ngày · cắt cửa sổ · dedup · blocklist · stratum · cohort ──► 1 dòng store, 19 trường
+  │
+  ├─(B-infer) tách 2 ĐƠN VỊ theo ô nguồn trường φ
+  │      unit POS = "Nhân viên nhiệt tình, hồ bơi ổn"   (φ = POS)
+  │      unit NEG = "Phòng ồn và đồ ăn sáng tệ"          (φ = NEG)
+  │            │
+  │            ├─ generate ──► chuỗi quad ──► parse ──► 4 quad Q1 Q2 Q3 Q4
+  │            ├─ conf_seq  (độ tin cậy CẢ CHUỖI)
+  │            ├─ P_model(s|x) (rescore 3 biến thể sentiment cho TỪNG quad)
+  │            └─ posterior ∝ P_model^λ · P(s|φ)^(1−λ)  ──► sentiment, p_posterior, provenance_flip
+  │
+  ├─(C) v_image (ảnh) ──► bridge r̂ (chỉ-text) ──► w = 1[tax hợp lệ] · r̂
+  │
+  └─(D) Σw theo (kỳ × stratum × aspect) ──► π, ν ──► CLR ──► deseason ──► OLS ──► permutation ──► BH-FDR ──► verdict</div>
+<h2>§1 · Mười một step — mỗi step <u>học</u> gì, <u>tính</u> gì</h2>
+<p>Chỉ có <b>ba</b> step thực sự “học” (có tham số được fit): B-train, B-selftrain, và hai head hồi quy
+của Module C. Mọi step còn lại là <b>tính xác định</b> — quan trọng không kém, vì chúng quyết định số nào
+được đưa vào chỗ học.</p>
+<table>
+<tr><th style="width:15px">#</th><th style="width:86px">Step</th><th style="width:31px">Loại</th>
+    <th>Học gì (tham số được fit) / Tính gì</th><th style="width:150px">Output khoá</th></tr>
+<tr><td>1</td><td>A · store</td><td><span class="badge cpu">tính</span></td>
+    <td>Không học gì. Tính: <span class="mono">period</span> từ chuỗi ngày tiếng Việt,
+        cờ <span class="mono">in_gold</span>, <span class="mono">stratum</span>, cohort.</td>
+    <td><span class="mono">reviews.jsonl.gz</span> 1.921.661 dòng</td></tr>
+<tr><td>2</td><td>B-data</td><td><span class="badge cpu">tính</span></td>
+    <td>Không học. Tính: chuỗi target tuyến tính hoá (ngữ pháp <span class="mono">&lt;quad&gt;…&lt;/quad&gt;</span>)
+        + kiểm tra round-trip.</td>
+    <td>23.995 quad → 3 file t2t</td></tr>
+<tr><td>3</td><td>B-train</td><td><span class="badge gpu">HỌC</span></td>
+    <td><b>Học toàn bộ trọng số mT5</b> bằng cross-entropy trên từng token của target:
+        “từ câu này, sinh ra chuỗi quad này”. Đây là chỗ duy nhất mô hình học <i>cách trích quad</i>.</td>
+    <td><span class="mono">models/seed_extractor/</span></td></tr>
+<tr><td>4</td><td>B-eval</td><td><span class="badge cpu">đo</span></td>
+    <td>Không học. Đo F1 exact-match 4 trường, tách theo ngôn ngữ / độ dài / cực tính →
+        <b>đây là nơi phát hiện recall lệch</b> (nguồn của D-a).</td>
+    <td><span class="mono">eval_report.json</span></td></tr>
+<tr><td>5</td><td>B-selftrain</td><td><span class="badge gpu">HỌC</span></td>
+    <td><b>Học tiếp</b> từ teacher trên gold ∪ pseudo. Cái mới được học: phân bố ngôn ngữ / độ dài của
+        <i>pool</i>, thứ gold không có. Hai guardrail chặn việc học chính bias của mình.</td>
+    <td><span class="mono">selftrain_round&lt;r&gt;/</span></td></tr>
+<tr><td>6</td><td>B-infer</td><td><span class="badge gpu">tính</span></td>
+    <td>Không học (model đóng băng). Tính 3 đại lượng/quad: <span class="mono">conf_seq</span>,
+        <span class="mono">P_model(s|x)</span>, <span class="mono">p_posterior</span>. §5.</td>
+    <td><span class="mono">pool_quads.*.jsonl.gz</span></td></tr>
+<tr><td>7</td><td>C1 verifier</td><td><span class="badge gpu">HỌC</span></td>
+    <td><b>Học head logistic 7 chiều</b> trên (ảnh, category): “ảnh này có ủng hộ category này không”.
+        CLIP encoder <b>đóng băng</b> — không học.</td>
+    <td><span class="mono">verifier.pkl</span> + AUC/ΔAUC</td></tr>
+<tr><td>8</td><td>C3 bridge</td><td><span class="badge gpu">HỌC</span></td>
+    <td><b>Học head logistic 5 chiều chỉ-text</b> dự đoán phán quyết của ảnh. Đây là bước “suy rộng”:
+        6,24% review có ảnh dạy cho 93,76% còn lại. Kèm IPW chống covariate shift.</td>
+    <td><span class="mono">bridge.pkl</span> + Spearman</td></tr>
+<tr><td>9</td><td>C4 apply</td><td><span class="badge cpu">tính</span></td>
+    <td>Không học. Tính <span class="mono">w = 1[tax hợp lệ] · r̂</span> cho <b>mọi</b> quad.</td>
+    <td><span class="mono">quads_weighted.jsonl.gz</span></td></tr>
+<tr><td>10</td><td>D · drift</td><td><span class="badge cpu">tính</span></td>
+    <td>Không học. Ước lượng π, ν (raw + adj), CLR, khử mùa, OLS, changepoint,
+        permutation null <b>riêng từng chuỗi</b>, BH-FDR, verdict. §8.</td>
+    <td><span class="mono">drift_results.*.json</span></td></tr>
+<tr><td>11</td><td>E · injection</td><td><span class="badge cpu">đo</span></td>
+    <td>Không học. Tiêm drift/không-drift có kiểm soát rồi kiểm tra pipeline trả lời đúng.
+        Thay cho ground truth mà bài toán không có.</td>
+    <td><span class="mono">injection_*.json</span></td></tr>
+</table>
+<div class="item info">
+<div class="hd">Một câu tóm tắt kiến trúc</div>
+<p>mT5 học <i>đọc</i>; hai head logistic học <i>chấm điểm độ tin cậy</i>; Module D không học gì cả —
+nó chỉ <b>cộng có trọng số rồi kiểm định</b>. Giá trị khoa học của bài nằm ở chỗ: con số cộng vào
+(<span class="mono">w</span>) mang thông tin về độ tin cậy đến từ <b>một sensor khác</b> (ảnh), và phép
+cộng đó được đứng theo thành phần tổng thể (strata) nên không trôi theo việc “ai đang viết review”.</p>
+</div>
+<div class="pb"></div>
+<h2>§2 · Module A — store: 8 bước, từ dòng thô ra 19 trường</h2>
+<h3>2.1 Chạy từng bước trên ví dụ</h3>
+<table>
+<tr><th style="width:26px">Bước</th><th style="width:120px">Làm gì</th><th>Thế số trên ví dụ</th>
+    <th style="width:108px">Kết quả</th></tr>
+<tr><td>A1</td><td>Parse ngày<br><span class="mono">parse_review_date</span></td>
+    <td>Khớp regex <span class="mono">ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})</span>
+        trên “Ngày đánh giá: ngày 5 tháng 9 năm 2023” → nhóm = (5, 9, 2023).
+        Kiểm 1≤9≤12 ✓, 1≤5≤31 ✓.</td>
+    <td><span class="mono">iso_date = 2023-09-05</span><br><span class="mono">period = 2023-09</span></td></tr>
+<tr><td>A2</td><td>Cắt cửa sổ<br><span class="mono">in_window</span></td>
+    <td>So chuỗi: <span class="mono">"2022-03" ≤ "2023-09" ≤ "2025-02"</span> — so sánh từ điển
+        trên <span class="mono">YYYY-MM</span> đúng bằng so sánh thời gian.</td>
+    <td>giữ ✓ <span class="badge real">SỐ THẬT</span> 12.602 dòng bị loại ở bước này</td></tr>
+<tr><td>A3</td><td>Dedup<br><span class="mono">text_hash</span></td>
+    <td>Khoá = MD5 của <span class="mono">norm_text("3977209|Linh|2023-09-05|Nhân viên nhiệt tình, hồ bơi ổn|Phòng ồn và đồ ăn sáng tệ")</span>.
+        <span class="mono">norm_text</span> = NFKC + hạ chữ + bỏ dấu câu + gộp khoảng trắng.</td>
+    <td>chưa thấy → giữ. 15.157 dòng (0,78%) bị loại</td></tr>
+<tr><td>A4</td><td>Gold blocklist<br><span class="mono">is_gold_leak</span></td>
+    <td>Hotel <span class="mono">3977209</span> <b>có</b> trong gold → không early-exit. Thử khoá ngày
+        (rỗng trên checkout hiện tại 🔴), rồi khoá hash text trên 3 biến thể: <span class="mono">text_pos</span>,
+        <span class="mono">text_neg</span>, <span class="mono">"{pos} {neg}"</span>. Không khớp.</td>
+    <td><span class="mono">in_gold = false</span> → được dùng cho infer</td></tr>
+<tr><td>A5</td><td>Ép kiểu</td><td>Gold lưu <span class="mono">hotel_id</span> kiểu int, pool kiểu str →
+        ép cả hai về <span class="mono">str</span>, nếu không thì join <b>không khớp dòng nào</b>.</td>
+    <td><span class="mono">"3977209"</span></td></tr>
+<tr><td>A6</td><td>Cờ text</td><td>pos và neg đều khác rỗng → <span class="mono">has_text = true</span>.
+        <span class="mono">n_words</span> = số từ của <span class="mono">"{pos} {neg}"</span> =
+        “Nhân viên nhiệt tình, hồ bơi ổn Phòng ồn và đồ ăn sáng tệ” = <b>12</b> từ.</td>
+    <td><span class="mono">n_words = 12</span> → <span class="mono">length_bin = L0</span> (0–15)</td></tr>
+<tr><td>A7</td><td>Language ID</td><td>CHƯA CÀI — output không có trường <span class="mono">lang</span>.</td>
+    <td>—</td></tr>
+<tr><td>A8</td><td>Stratum + cohort</td>
+    <td><span class="mono">country_bloc("Việt Nam") = VN</span>;
+        <span class="mono">traveller_type("Cặp đôi") = "Cặp đôi"</span> (∈ TRAVELLER_TYPES);
+        <span class="mono">USE_LENGTH_IN_STRATA = False</span> nên <b>không</b> gắn L0 vào stratum.</td>
+    <td><span class="mono">stratum = ["VN","Cặp đôi"]</span></td></tr>
+</table>
+<div class="calc"><b>review_uid</b> = f"{hotel_id}_{iso không gạch}_{chỉ số dòng:08d}"
+              = "3977209" + "_" + "20230905" + "_" + "00000416"
+              = <b>3977209_20230905_00000416</b>
+   → khoá join xuyên suốt pipeline, và cũng là tên file ảnh pool: pool_images/3977209_20230905_00000416.jpg</div>
+<h3>2.2 Dòng store sinh ra (19 trường)</h3>
+<pre>{"review_uid":"3977209_20230905_00000416", "hotel_id":"3977209",
+ "iso_date":"2023-09-05", "period":"2023-09",
+ "text_pos":"Nhân viên nhiệt tình, hồ bơi ổn", "text_neg":"Phòng ồn và đồ ăn sáng tệ",
+ "score":7.5, "stars_rating":4.0,
+ "stratum":["VN","Cặp đôi"], "country_bloc":"VN", "traveller":"Cặp đôi",
+ "n_words":12, "nights":2, "room":"Phòng Deluxe Giường Đôi",
+ "has_text":true, "has_photo":true, "photo_urls":["https://cf.bstatic.com/.../ph1.jpg"],
+ "in_gold":false, "gold_split":"train"}</pre>
+<p><b>Chú ý ba chỗ dễ đọc nhầm.</b> (i) <span class="mono">score = 7,5</span> đọc từ
+“Đạt điểm 7,5” — dấu <b>phẩy</b> thập phân, <span class="mono">parse_score</span> bỏ tiền tố rồi khớp
+<span class="mono">(\d{1,2})([.,](\d))?</span>. (ii) <span class="mono">gold_split = "train"</span> là
+<b>thuộc tính của hotel</b>, không phải của review này — nó chỉ dùng để dựng cohort T-unbiased.
+(iii) <span class="mono">in_gold = false</span> nhưng <span class="mono">gold_split</span> khác null:
+hotel có gold, riêng review này thì không nằm trong gold.</p>
+<div class="item bad">
+<div class="hd">Bỏ Module A thì hỏng gì</div>
+<p>Không có <span class="mono">period</span> → không có trục thời gian, cả bài không tồn tại.
+Không có <span class="mono">in_gold</span> → self-training nuốt cả test set, và <b>mọi F1 báo cáo trở nên
+vô hiệu mà không có cách nào phát hiện bằng cách đọc kết quả</b>. Không có
+<span class="mono">stratum</span> → Module D không có gì để đứng theo, và toàn bộ phần D-b sụp.</p>
+<p class="mono" style="color:#b91c1c">🔴 Trạng thái hiện tại: khoá blocklist (hotel, date) rỗng vì thiếu
+metadata/reviews_with_dates.jsonl → flag_gold_leak tụt 18.475 → 1.466. Kiểm
+blocklist_date_key_active trong store_report.json trước mỗi run.</p>
+</div>
+<h2>§3 · Module B-data — linear hoá & parse</h2>
+<p>Model sinh <b>văn bản</b>, không sinh cấu trúc. Nên quad phải được mã hoá thành chuỗi, và chuỗi
+phải giải mã lại được. Trên ví dụ, giả sử annotator đã gán 4 quad cho hai segment:</p>
+<div class="calc">segment POS: "Nhân viên nhiệt tình, hồ bơi ổn"
+  target = "&lt;quad&gt; Nhân viên | SER_ATTITUDE | nhiệt tình | positive &lt;/quad&gt; &lt;quad&gt; hồ bơi | AM_POOL | ổn | neutral &lt;/quad&gt;"
+
+segment NEG: "Phòng ồn và đồ ăn sáng tệ"
+  target = "&lt;quad&gt; Phòng | FAC_ROOM | ồn | negative &lt;/quad&gt; &lt;quad&gt; đồ ăn sáng | AM_FOOD | tệ | negative &lt;/quad&gt;"
+
+input  = "extract quads: " + segment          <span style="color:#64748b">← TASK_PREFIX</span>
+thứ tự 4 trường = aspect_term | taxonomy_code | opinion_term | sentiment
+aspect_category KHÔNG nằm trong target — suy từ CODE2CAT[code] lúc parse</div>
+<h4>Parse ngược — neo vào hai trường xác định được</h4>
+<p><span class="mono">parse_linearized</span> <b>không</b> đếm đủ 4 trường rồi gán theo vị trí. Nó neo:
+<b>sentiment là trường cuối</b>, <b>taxonomy_code là trường duy nhất thuộc CODE2CAT</b>; phần trước code là
+aspect, phần giữa code và sentiment là opinion. Nhờ vậy một term tự chứa <span class="mono">|</span> vẫn parse được.</p>
+<table>
+<tr><th style="width:200px">Chuỗi model sinh</th><th style="width:150px">Tách theo <span class="mono">|</span></th>
+    <th>Kết quả parse</th></tr>
+<tr><td><span class="mono">&lt;quad&gt; Phòng | FAC_ROOM | ồn | negative &lt;/quad&gt;</span></td>
+    <td>4 trường</td>
+    <td>✓ aspect=Phòng · code=FAC_ROOM · cat=FACILITY · opinion=ồn · sentiment=negative</td></tr>
+<tr><td><span class="mono">&lt;quad&gt; giá | chất lượng | EXP_VALUE | tệ | negative &lt;/quad&gt;</span></td>
+    <td>5 trường</td>
+    <td>✓ code ở vị trí 3 (duy nhất ∈ CODE2CAT) → aspect = “giá | chất lượng”, opinion = “tệ”.
+        <span class="badge p2">Bản cũ bỏ cả quad này</span></td></tr>
+<tr><td><span class="mono">&lt;quad&gt; wifi | AM_WIFI | chậm | rất tệ &lt;/quad&gt;</span></td>
+    <td>4 trường</td>
+    <td>✗ bỏ — <span class="mono">"rất tệ" ∉ {positive, neutral, negative}</span></td></tr>
+<tr><td><span class="mono">&lt;quad&gt; phòng | FAC_ROOMS | ồn | negative &lt;/quad&gt;</span></td>
+    <td>4 trường</td>
+    <td>✗ bỏ — <span class="mono">FAC_ROOMS ∉ CODE2CAT</span>: <b>hard-filter taxonomy ngay tại parse</b></td></tr>
+</table>
+<div class="item keep"><div class="hd">Bước này học gì</div>
+<p><b>Không học gì</b> — nhưng nó quyết định <i>cái gì được coi là hợp lệ</i>. Taxonomy là ràng buộc
+<b>cứng</b> (một code lạ không tồn tại về mặt khái niệm) nên nằm ở parse. Provenance và reliability là
+score <b>mềm</b> — không bao giờ được biến thành bộ lọc. Nhầm hai loại này là lỗi thiết kế, không phải lỗi code.</p></div>
+<h2>§4 · Module B-train — mô hình học <u>chính xác</u> cái gì</h2>
+<p>Loss là cross-entropy trên <b>từng token của target</b>, padding đặt <span class="mono">-100</span>
+để loại khỏi loss. Với target 19 token của segment NEG, mỗi bước sinh model nhìn câu nguồn + các token đã sinh
+trước đó và phải đoán token kế tiếp:</p>
+<div class="calc">L = −(1/|y|) · Σᵢ log P(yᵢ | x, y&lt;ᵢ)
+
+x = "extract quads: Phòng ồn và đồ ăn sáng tệ"
+y = &lt;quad&gt; Phòng | FAC_ROOM | ồn | negative &lt;/quad&gt; &lt;quad&gt; đồ ăn sáng | AM_FOOD | tệ | negative &lt;/quad&gt; &lt;/s&gt;
+
+Ở bước i = 4 model đã sinh "&lt;quad&gt; Phòng |" và phải đoán token kế tiếp.
+  Nếu P(FAC_ROOM | …) = 0,84  →  đóng góp vào loss: −log 0,84 = 0,174
+  Nếu P(FAC_ROOM | …) = 0,05  →  đóng góp:          −log 0,05 = 2,996   ← bị phạt nặng gấp 17×</div>
+<p><b>Vậy mô hình học ba thứ cùng lúc, không tách rời:</b> (1) <i>ngữ pháp output</i> — mở
+<span class="mono">&lt;quad&gt;</span> thì phải đóng, đúng 4 trường, đúng thứ tự; (2) <i>ánh xạ span → code</i> —
+“Phòng” đi với FAC_ROOM chứ không phải FAC_BUILDING; (3) <i>cực tính</i> — “ồn” là negative.
+Ba thứ này dùng chung một loss nên chúng <b>trao đổi được với nhau</b>: model có thể hy sinh độ chính xác
+cực tính để giữ đúng ngữ pháp. Đây chính là lý do §5 phải <b>rescore lại sentiment riêng</b> thay vì tin
+vào chuỗi model đã sinh.</p>
+<table>
+<tr><th class="c">Epoch</th><th class="c">1</th><th class="c">2</th><th class="c">3</th><th class="c">4</th>
+    <th class="c">5</th><th class="c">6</th><th class="c">7</th><th class="c">8</th><th class="c">9</th><th class="c">10</th></tr>
+<tr><td>train loss</td><td class="c">5,867</td><td class="c">0,408</td><td class="c">0,315</td><td class="c">0,270</td>
+    <td class="c">0,241</td><td class="c">0,222</td><td class="c">0,208</td><td class="c">0,196</td>
+    <td class="c">0,188</td><td class="c">0,183</td></tr>
+<tr><td>dev loss</td><td class="c">0,332</td><td class="c">0,265</td><td class="c">0,234</td><td class="c">0,217</td>
+    <td class="c">0,210</td><td class="c">0,201</td><td class="c">0,197</td><td class="c">0,193</td>
+    <td class="c" style="background:#dcfce7"><b>0,190</b></td><td class="c" style="background:#fee2e2">0,191 ↑</td></tr>
+</table>
+<p class="sub" style="margin-top:-3px"><span class="badge real">SỐ THẬT</span> mt5-small · T4 · 10 epoch ·
+~66 phút · <span class="mono">best_dev_loss = 0,190413</span> tại epoch 9 → <b>checkpoint lưu là epoch 9</b>,
+không phải epoch 10. Keep-best theo dev loss, không phải theo epoch cuối.</p>
+<div class="item warn"><div class="hd">Cạm bẫy: dev loss thấp KHÔNG thay cho F1</div>
+<p>Loss 0,190 nói “model đoán token tốt”. Nó <b>không</b> nói “model trích đúng quad”: một quad sai đúng một
+token sentiment vẫn có loss thấp nhưng exact-match F1 = 0 cho quad đó. Phải chạy §8 của spec (B-eval) để có
+số báo cáo. Và phải đọc bảng <span class="mono">by_length</span>: L2 thấp chính là bằng chứng của D-a.</p></div>
+<div class="pb"></div>
+<h2>§5 · Module B-infer — ba con số cho mỗi quad</h2>
+<p>Model đã đóng băng. Bước này <b>không học</b>, nó tính ba đại lượng, và đây là phần số học đáng
+xem nhất của Module B.</p>
+<h3>5.1 Tách đơn vị suy luận theo ô nguồn trường φ</h3>
+<table>
+<tr><th style="width:44px">Đơn vị</th><th style="width:40px">φ</th><th>Text</th>
+    <th style="width:190px">Vì sao gắn φ ở mức ĐOẠN chứ không mức review</th></tr>
+<tr><td>u₁</td><td><span class="mono">POS</span></td><td>“Nhân viên nhiệt tình, hồ bơi ổn”</td>
+    <td rowspan="2">Cùng một review có đoạn nằm trong ô “điểm cộng” và đoạn nằm trong ô “chưa hài lòng”.
+    Gắn φ ở mức review sẽ trộn hai prior rất khác nhau — <b>0,931</b> vs <b>0,641</b> — và posterior mất
+    hết ý nghĩa. Đây là lý do một review sinh tối đa <b>2</b> đơn vị, không phải 1.</td></tr>
+<tr><td>u₂</td><td><span class="mono">NEG</span></td><td>“Phòng ồn và đồ ăn sáng tệ”</td></tr>
+</table>
+<h3>5.2 <span class="mono">conf_seq</span> — độ tin cậy của CẢ CHUỖI</h3>
+<div class="fx">conf_seq = exp( (1/|y|) · Σᵢ log P(yᵢ | x, y&lt;ᵢ) )
+<span class="why">Trung bình log-prob token của chính chuỗi model vừa sinh, rồi lấy exp. Tính bằng
+<b>teacher forcing</b>: chạy lại một forward pass với <span class="mono">labels</span> = chuỗi đã decode,
+<span class="mono">log_softmax</span>, gather đúng log-prob của token đã chọn, mask padding. Chia cho |y|
+là bắt buộc — không chia thì chuỗi dài luôn “kém tin cậy” hơn chuỗi ngắn chỉ vì nó dài.</span></div>
+<p>Thế số cho đơn vị u₂ (φ=NEG), 19 token: <span class="badge syn">SỐ MINH HOẠ</span></p>
+<table style="font-size:8.4px"><tr><th style="width:54px">token i</th><th class="c">1</th><th class="c">2</th><th class="c">3</th><th class="c">4</th><th class="c">5</th><th class="c">6</th><th class="c">7</th><th class="c">8</th><th class="c">9</th><th class="c">10</th><th class="c">11</th><th class="c">12</th><th class="c">13</th><th class="c">14</th><th class="c">15</th><th class="c">16</th><th class="c">17</th><th class="c">18</th><th class="c">19</th></tr>
+<tr><td><span class="mono">yᵢ</span></td><td class="c mono" style="font-size:7px">&lt;quad&gt;</td><td class="c mono" style="font-size:7px">Phòng</td><td class="c mono" style="font-size:7px">|</td><td class="c mono" style="font-size:7px">FAC_ROOM</td><td class="c mono" style="font-size:7px">|</td><td class="c mono" style="font-size:7px">ồn</td><td class="c mono" style="font-size:7px">|</td><td class="c mono" style="font-size:7px">negative</td><td class="c mono" style="font-size:7px">&lt;/quad&gt;</td><td class="c mono" style="font-size:7px">&lt;quad&gt;</td><td class="c mono" style="font-size:7px">đồ ăn sáng</td><td class="c mono" style="font-size:7px">|</td><td class="c mono" style="font-size:7px">AM_FOOD</td><td class="c mono" style="font-size:7px">|</td><td class="c mono" style="font-size:7px">tệ</td><td class="c mono" style="font-size:7px">|</td><td class="c mono" style="font-size:7px">negative</td><td class="c mono" style="font-size:7px">&lt;/quad&gt;</td><td class="c mono" style="font-size:7px">&lt;/s&gt;</td></tr>
+<tr><td>log P(yᵢ|·)</td><td class="c">-0,02</td><td class="c">-0,31</td><td class="c">-0,01</td><td class="c">-0,18</td><td class="c">-0,01</td><td class="c">-0,44</td><td class="c">-0,01</td><td class="c">-0,12</td><td class="c">-0,03</td><td class="c">-0,09</td><td class="c">-0,63</td><td class="c">-0,01</td><td class="c">-0,22</td><td class="c">-0,01</td><td class="c">-0,51</td><td class="c">-0,01</td><td class="c">-0,15</td><td class="c">-0,02</td><td class="c">-0,05</td></tr></table>
+<div class="calc">Σᵢ log P(yᵢ|·) = -2,83          |y| = 19
+mean            = -2,83 / 19 = <b>-0,14895</b>
+conf_seq(u₂)    = exp(-0,14895) = <b>0,8616</b>
+
+đơn vị u₁ (φ=POS, 19 token): Σ = -0,98 → mean = -0,05158 → conf_seq(u₁) = <b>0,9497</b>
+   (u₁ dễ hơn: "nhiệt tình → positive" là mẫu thường gặp trong gold; u₂ có "đồ ăn sáng" là
+    aspect_term nhiều từ nên token đó tốn log-prob −0,63)</div>
+<div class="item warn"><div class="hd">Vì sao không dùng <span class="mono">generate(output_scores=True)</span></div>
+<p>Cách đó giữ logits full-vocab (~250k của mT5) cho <b>mọi</b> bước sinh → OOM ngay trên T4. Cách hiện tại
+chỉ giữ log-prob của token <i>đã chọn</i> và chunk theo <span class="mono">--score-batch</span>.
+Đây là lý do tồn tại của <span class="mono">seq_conf</span>/<span class="mono">seq_logprobs</span> thay vì
+gọi API tiện hơn.</p></div>
+<h3>5.3 <span class="mono">P_model(s|x)</span> — rescore 3 biến thể sentiment</h3>
+<p><b>Đây là chỗ đắt nhất của cả pipeline, và cũng là chỗ dễ hiểu sai nhất.</b> Model đã sinh ra một
+sentiment rồi — nhưng sentiment đó chỉ là “token nào thắng trong beam search”, không phải một phân phối xác
+suất được chuẩn hoá trên 3 lựa chọn. Để có phân phối đó, với <b>từng</b> quad ta dựng lại
+<b>toàn bộ</b> chuỗi target 3 lần, mỗi lần chỉ đổi sentiment của đúng quad đang xét và
+<b>giữ nguyên mọi quad khác</b>, rồi softmax trên tổng log-prob của 3 chuỗi.</p>
+<div class="calc">Ví dụ với Q1 (quad đầu của u₂). Ba biến thể — chỉ khác đúng một token:
+ s=positive: "&lt;quad&gt; Phòng | FAC_ROOM | ồn | <b>positive</b> &lt;/quad&gt; &lt;quad&gt; đồ ăn sáng | AM_FOOD | tệ | negative &lt;/quad&gt;"
+ s=neutral : "&lt;quad&gt; Phòng | FAC_ROOM | ồn | <b>neutral</b>  &lt;/quad&gt; &lt;quad&gt; đồ ăn sáng | AM_FOOD | tệ | negative &lt;/quad&gt;"
+ s=negative: "&lt;quad&gt; Phòng | FAC_ROOM | ồn | <b>negative</b> &lt;/quad&gt; &lt;quad&gt; đồ ăn sáng | AM_FOOD | tệ | negative &lt;/quad&gt;"
+
+P_model(s|x) = softmax_s ( Σᵢ log P(yᵢ^(s) | x, y&lt;ᵢ^(s)) )      ← softmax trên 3 TỔNG log-prob</div>
+<p>Tổng log-prob của 3 biến thể, cho cả 4 quad của review: <span class="badge syn">SỐ MINH HOẠ</span></p>
+<table><tr><th style="width:30px">Quad</th><th style="width:112px">Nội dung</th><th style="width:34px">φ</th>
+<th class="n">Σlp<br>pos</th><th class="n">Σlp<br>neu</th><th class="n">Σlp<br>neg</th>
+<th class="n">P<sub>model</sub><br>pos</th><th class="n">P<sub>model</sub><br>neu</th><th class="n">P<sub>model</sub><br>neg</th>
+<th style="width:56px">s<sub>model</sub></th></tr>
+<tr><td><b>Q1</b></td><td><span class="mono">FAC_ROOM</span><br><span style="font-size:8px;color:#64748b">Phòng | ồn</span></td><td class="c mono">NEG</td><td class="n">-9,85</td><td class="n">-7,42</td><td class="n">-3,11</td><td class="n">0,0012</td><td class="n">0,0132</td><td class="n">0,9856</td><td>negative</td></tr>
+<tr><td><b>Q2</b></td><td><span class="mono">AM_FOOD</span><br><span style="font-size:8px;color:#64748b">đồ ăn sáng | tệ</span></td><td class="c mono">NEG</td><td class="n">-10,90</td><td class="n">-8,05</td><td class="n">-3,02</td><td class="n">0,0004</td><td class="n">0,0065</td><td class="n">0,9931</td><td>negative</td></tr>
+<tr><td><b>Q3</b></td><td><span class="mono">SER_ATTITUDE</span><br><span style="font-size:8px;color:#64748b">Nhân viên | nhiệt tình</span></td><td class="c mono">POS</td><td class="n">-1,62</td><td class="n">-5,30</td><td class="n">-8,44</td><td class="n">0,9744</td><td class="n">0,0246</td><td class="n">0,0011</td><td>positive</td></tr>
+<tr><td><b>Q4</b></td><td><span class="mono">AM_POOL</span><br><span style="font-size:8px;color:#64748b">hồ bơi | ổn</span></td><td class="c mono">NEG</td><td class="n">-4,21</td><td class="n">-3,97</td><td class="n">-4,14</td><td class="n">0,2991</td><td class="n">0,3802</td><td class="n">0,3207</td><td>neutral</td></tr>
+</table>
+<div class="calc">Thế số cho Q1:  softmax(−9,85 ; −7,42 ; −3,11)
+  trừ max (= −3,11) cho ổn định số:   (−6,74 ; −4,31 ; 0)
+  exp:                                 (0,001183 ; 0,013432 ; 1,0)
+  tổng = 1,014615
+  P_model = (0,001183/1,014615 ; 0,013432/1,014615 ; 1/1,014615)
+          = (<b>0,0012</b> ; <b>0,0132</b> ; <b>0,9856</b>)</div>
+<div class="item bad"><div class="hd">Chi phí bậc hai — và cái bẫy im lặng đi kèm</div>
+<p>Một unit có <b>n</b> quad phải chấm <b>3n</b> chuỗi, mỗi chuỗi dài <b>n</b> quad → chi phí ~<b>n²</b>.
+Với <span class="mono">MAX_TGT_TOKENS = 192</span>, unit từ khoảng <b>≥9–10 quad</b> trở lên bị truncate
+<b>mất chính cái quad đang xét</b> → cả 3 biến thể tokenize giống hệt nhau → 3 tổng log-prob bằng nhau →
+<span class="mono">P_model = (⅓,⅓,⅓)</span> → posterior <b>thoái hoá thành prior thuần</b>: sentiment do φ
+quyết định hoàn toàn và <span class="mono">provenance_flip</span> bật lung tung.
+Không exception nào, chỉ là số. Gold có segment tới <b>23</b> quad nên đường này chạm được.
+Nay phát hiện bằng <span class="mono">max(lp) − min(lp) &lt; DEGENERATE_LP_EPS</span> và ghi hai cờ
+<span class="mono">p_model_exact</span> / <span class="mono">p_model_truncated</span> vào từng dòng.</p></div>
+<h3>5.4 Provenance posterior — nơi “ô nguồn trường” trở thành bằng chứng</h3>
+<div class="fx">P(s | x, φ) ∝ P<sub>model</sub>(s | x)<sup>λ</sup> · P(s | φ)<sup>1−λ</sup>&nbsp;&nbsp;&nbsp; (λ = 0,7)
+<span class="why">Cài dưới dạng log-linear rồi softmax ổn định số:
+<span class="mono">post[s] = λ·log P_model[s] + (1−λ)·log prior[s]</span>, trừ max trước khi exp.
+Trả về (s* = argmax, p_posterior = xác suất chuẩn hoá của s*).</span></div>
+<table style="width:62%"><tr><th>Prior <span class="badge real">SỐ THẬT</span> — đo trên 14.129 quad gold</th>
+<th class="n">→ positive</th><th class="n">→ neutral</th><th class="n">→ negative</th></tr>
+<tr><td><span class="mono">review_positive</span> (φ = POS), n = 11.733</td>
+    <td class="n">0,931</td><td class="n">0,036</td><td class="n">0,033</td></tr>
+<tr><td><span class="mono">review_negative</span> (φ = NEG), n = 2.396</td>
+    <td class="n">0,217</td><td class="n">0,142</td><td class="n"><b>0,641</b></td></tr></table>
+<p><b>Bất đối xứng 0,931 vs 0,641 là một phát hiện, không phải nhiễu.</b> Khách thường viết nội dung
+tích cực <i>ngay trong ô “chưa hài lòng”</i> (“The owner was lovely although…”), và annotation gán positive
+ở đó là đúng. Vì vậy prior <b>không được</b> giả định đối xứng, và <b>không được</b> dùng làm bộ lọc cứng —
+lọc cứng sẽ vứt đúng <b>21,7%</b> ca khó và giàu thông tin nhất.</p>
+<h4>Thế số đầy đủ cho Q4 — ca <span class="mono">provenance_flip</span></h4>
+<p>Q4 là quad “hồ bơi | ổn” nằm trong ô NEG. Model lưỡng lự thật sự:
+P<sub>model</sub> = (0,2991 ; 0,3802 ; 0,3207) — neutral nhỉnh hơn negative đúng 0,0594. Prior của ô NEG bẻ cán cân:</p>
+<table><tr><th style="width:64px">s</th><th class="n">P<sub>model</sub>(s)</th><th class="n">log P<sub>model</sub></th>
+<th class="n">P(s|φ=NEG)</th><th class="n">log prior</th>
+<th class="n">0,7·logP<sub>m</sub> + 0,3·log prior</th><th class="n">exp(·−max)</th><th class="n">posterior</th></tr>
+<tr><td><b>positive</b></td><td class="n">0,2991</td><td class="n">-1,20710</td><td class="n">0,217</td><td class="n">-1,52786</td><td class="n"><b>-1,30332</b></td><td class="n">0,68802</td><td class="n"><b>0,2861</b></td></tr>
+<tr><td><b>neutral</b></td><td class="n">0,3802</td><td class="n">-0,96710</td><td class="n">0,142</td><td class="n">-1,95193</td><td class="n"><b>-1,26255</b></td><td class="n">0,71666</td><td class="n"><b>0,2980</b></td></tr>
+<tr style="background:#fef9c3"><td><b>negative</b></td><td class="n">0,3207</td><td class="n">-1,13710</td><td class="n">0,641</td><td class="n">-0,44473</td><td class="n"><b>-0,92938</b></td><td class="n">1,00000</td><td class="n"><b>0,4159</b></td></tr>
+</table>
+<div class="calc">positive: 0,7·(-1,20710) + 0,3·(-1,52786) = -0,84497 + -0,45836 = -1,30332
+neutral : 0,7·(-0,96710) + 0,3·(-1,95193) = -0,67697 + -0,58558 = -1,26255
+negative: 0,7·(-1,13710) + 0,3·(-0,44473) = -0,79597 + -0,13342 = <b>-0,92938</b>  ← max
+
+Σ exp(· − max) = 0,68802 + 0,71666 + 1,00000 = 2,40467
+p_posterior    = 1,00000 / 2,40467 = <b>0,4159</b>
+
+s_model = <b>neutral</b>   →   s* = <b>negative</b>   →   <b>provenance_flip = true</b></div>
+<div class="item info"><div class="hd">Đọc kết quả này thế nào</div>
+<p>Khi model <b>chắc chắn</b> (Q1, Q2, Q3: P<sub>model</sub> &gt; 0,97), prior gần như không đổi được gì —
+posterior chỉ hạ nhẹ vì λ = 0,7 kéo về phía prior một chút. Khi model <b>lưỡng lự</b> (Q4), prior quyết định.
+Đó đúng là hành vi ta muốn từ một prior: <i>im lặng khi có bằng chứng mạnh, lên tiếng khi không có</i>.
+Và <span class="mono">p_posterior = 0,4159</span> của Q4 <b>thấp</b> — nó tự khai báo rằng mình không đáng tin,
+để §6 và §7 xử lý.</p></div>
+<h4>Bốn quad sau posterior — dòng output cuối của Module B</h4>
+<table><tr><th style="width:30px">Quad</th><th style="width:84px">code</th><th style="width:32px">φ</th>
+<th class="n">conf_seq</th><th>s<sub>model</sub></th><th>s* (posterior)</th><th class="n">p_posterior</th>
+<th class="c">flip</th><th>Vào kênh π?</th></tr>
+<tr><td><b>Q1</b></td><td class="mono">FAC_ROOM</td><td class="c mono">NEG</td><td class="n">0,8616</td><td>negative</td><td><b>negative</b></td><td class="n">0,9638</td><td class="c">—</td><td><b style="color:#15803d">CÓ</b> — φ=NEG</td></tr>
+<tr><td><b>Q2</b></td><td class="mono">AM_FOOD</td><td class="c mono">NEG</td><td class="n">0,8616</td><td>negative</td><td><b>negative</b></td><td class="n">0,9787</td><td class="c">—</td><td><b style="color:#15803d">CÓ</b> — φ=NEG</td></tr>
+<tr><td><b>Q3</b></td><td class="mono">SER_ATTITUDE</td><td class="c mono">POS</td><td class="n">0,9497</td><td>positive</td><td><b>positive</b></td><td class="n">0,9692</td><td class="c">—</td><td>không</td></tr>
+<tr><td><b>Q4</b></td><td class="mono">AM_POOL</td><td class="c mono">NEG</td><td class="n">0,8616</td><td>neutral</td><td><b>negative</b></td><td class="n">0,4159</td><td class="c"><b style="color:#c2410c">✔</b></td><td><b style="color:#15803d">CÓ</b> — φ=NEG</td></tr>
+</table>
+<p class="sub">Lưu ý bất biến: trường <span class="mono">sentiment</span> trong file output là
+<b>posterior</b>; sentiment gốc của model nằm ở <span class="mono">sentiment_model</span>. Module C và D
+đều đọc <span class="mono">sentiment</span>. Đọc nhầm trường = dùng một estimand khác.</p>
+<div class="pb"></div>
+<h2>§6 · Module B-selftrain — pseudo-label nào được học, pseudo-label nào bị loại</h2>
+<p>Tiêu chí là <b>hai</b> ngưỡng, không phải một: <span class="mono">conf_seq ≥ --tau (0,7)</span>
+<b>VÀ</b> <span class="mono">p_posterior ≥ --tau-post (0,8)</span>. Áp lên 4 quad của ví dụ:</p>
+<table><tr><th style="width:30px">Quad</th><th class="n">conf_seq</th><th class="c">≥ 0,7?</th>
+<th class="n">p_posterior</th><th class="c">≥ 0,8?</th><th class="c">Giữ?</th><th>Diễn giải</th></tr>
+<tr><td><b>Q1</b></td><td class="n">0,8616</td><td class="c">✓</td><td class="n">0,9638</td><td class="c">✓</td><td class="c"><b><span style="color:#15803d">GIỮ</span></b></td><td>quad sạch — vào tập train của student</td></tr>
+<tr><td><b>Q2</b></td><td class="n">0,8616</td><td class="c">✓</td><td class="n">0,9787</td><td class="c">✓</td><td class="c"><b><span style="color:#15803d">GIỮ</span></b></td><td>quad sạch — vào tập train của student</td></tr>
+<tr><td><b>Q3</b></td><td class="n">0,9497</td><td class="c">✓</td><td class="n">0,9692</td><td class="c">✓</td><td class="c"><b><span style="color:#15803d">GIỮ</span></b></td><td>quad sạch nhất (ô POS, mẫu quen thuộc)</td></tr>
+<tr><td><b>Q4</b></td><td class="n">0,8616</td><td class="c">✓</td><td class="n">0,4159</td><td class="c">✗</td><td class="c"><b><span style="color:#b91c1c">LOẠI</span></b></td><td>bị loại vì posterior thấp. <b>Đúng như thiết kế</b>: quad lật cực tính là ca khó, cho student học sẽ dạy nó chính cái nhiễu của teacher</td></tr>
+</table>
+<div class="item keep"><div class="hd">Lọc mềm, không lọc cứng — khác biệt quan trọng</div>
+<p>Q4 bị loại <b>khỏi tập train của student</b>, nhưng nó <b>vẫn nằm trong file output</b> và
+<b>vẫn được tính vào Module D</b> với trọng số <span class="mono">w</span> nhỏ (§7.4:
+w = 0,3036). Đây là nguyên tắc xuyên suốt: <i>provenance và reliability là score mềm, không bao giờ được
+biến thành bộ lọc</i>. Lọc cứng sẽ vứt đúng nhóm ca mỉa mai / phủ định / lỗi extractor — nhóm giàu
+thông tin nhất.</p></div>
+<h4>Hai guardrail — dừng trước khi mô hình học chính bias của nó</h4>
+<table><tr><th style="width:118px">Guardrail</th><th>Cơ chế</th><th style="width:210px">Thế số ví dụ</th></tr>
+<tr><td><b>1 · lệch phân phối lớp</b></td>
+<td>Dừng nếu <span class="mono">| %%negative(pseudo) − gold_neg_rate | &gt; --max-skew (0,10)</span>.
+<span class="mono">gold_neg_rate</span> nay <b>đo tại chỗ</b> mỗi lần chạy chứ không hardcode 0,154.</td>
+<td><span class="mono">gold_neg_rate = 0,154</span><br>
+vòng 1: pseudo neg 0,196 → |0,196−0,154| = <b>0,042</b> ≤ 0,10 ✓ đi tiếp<br>
+vòng 2: pseudo neg 0,281 → |0,281−0,154| = <b>0,127</b> &gt; 0,10 ✗ <b>DỪNG</b><br>
+<span style="font-size:8.4px;color:#b45309">Đọc: extractor bắt đầu tự khuếch đại xu hướng gán negative.
+Nếu để chạy tiếp, kênh ν sẽ trôi <i>vì công cụ</i>, không phải vì dữ liệu — và không dấu vết nào trong
+kết quả cho thấy điều đó.</span></td></tr>
+<tr><td><b>2 · dev F1 không cải thiện</b></td>
+<td>Đo dev F1 của <b>teacher gốc</b> trước vòng 1 (ghi thành <span class="mono">round: 0</span>) và chỉ nhận
+checkpoint mới khi nó <b>vượt mốc tốt nhất đã thấy</b>.</td>
+<td>round 0 (seed): F1 = 0,612<br>round 1: F1 = 0,631 &gt; 0,612 ✓ nhận<br>
+round 2: F1 = 0,627 &lt; 0,631 ✗ <b>DỪNG</b>, <span class="mono">final_ckpt = selftrain_round1</span><br>
+<span style="font-size:8.4px;color:#b45309">Bản cũ chỉ so với vòng ngay trước nên vòng 1 <i>luôn</i> được
+nhận, kể cả khi nó làm dev tụt so với seed.</span></td></tr>
+</table>
+<div class="calc">max_n = --max-ratio × |gold_train| = 3,0 × 8.816 = <b>26.448</b> instance pseudo tối đa
+    (cắt sau khi shuffle theo RANDOM_SEED + rnd — shuffle TRƯỚC khi cắt, nếu không mẫu sẽ lệch
+     theo thứ tự file, mà file pool sắp theo thời gian ⇒ mẫu lệch theo thời gian)</div>
+<div class="pb"></div>
+<h2>§7 · Module C — từ ảnh ra trọng số <span class="mono">w</span> cho mọi quad</h2>
+<p class="lead" style="margin-top:2px"><b>Vấn đề module này giải.</b> Mọi tín hiệu text-based —
+model confidence, cross-model agreement, field provenance — <b>chia sẻ cùng một nguồn lỗi</b>. Hai model
+train trên cùng gold sẽ cùng sai một kiểu; agreement cao không chứng minh đúng. Ảnh là một
+<b>sensor khác</b>: nó không chia sẻ nguồn lỗi đó. Đóng góp không phải “dùng ảnh để extract tốt hơn”
+(multimodal ABSA đã làm) mà là <b>dùng ảnh để ước lượng độ tin cậy của pseudo-label, rồi suy rộng ra
+ngoài phạm vi có ảnh</b> — 6,24% review có ảnh hiệu chỉnh cho 93,76% còn lại.</p>
+<h3>7.1 C1 · verifier — head 7 chiều trên (ảnh, category)</h3>
+<div class="calc">x = [ cos_sim(emb_ảnh, emb_prompt_category) ] ⧺ one_hot(category)        ← 1 + 6 = <b>7 chiều</b>
+z = b + wᵀx ;  v = σ(z) = 1/(1+e^(−z))
+encoder: open_clip ViT-B-32 / laion2b_s34b_b79k — <b>ĐÓNG BĂNG</b> (chỉ head logistic được fit)
+nhãn: (ảnh, c, y=1) với mọi c xuất hiện trong review; negative = category KHÔNG xuất hiện, cân bằng ~1:1</div>
+<p>Thế số, hệ số head <span class="badge syn">SỐ MINH HOẠ</span> b = −1,94, w = [4,82 · 0,31 · −0,12 · −0,05 · −0,22 · −0,61 · −0,75]:</p>
+<table><tr><th style="width:126px">Ảnh × category</th><th class="n">cos_sim</th>
+<th>z = b + 4,82·sim + w<sub>cat</sub></th><th class="n">v = σ(z)</th><th class="c">y = 1[v ≥ 0,5]</th></tr>
+<tr><td>ảnh hồ bơi × <b>AMENITY</b></td><td class="n">0,2814</td><td class="mono" style="font-size:8.4px">−1,94 + 4,82·0,2814 + (0,31) = -0,7037</td><td class="n"><b>0,3310</b></td><td class="c">0</td></tr>
+<tr><td>ảnh hồ bơi × <b>FACILITY</b></td><td class="n">0,2103</td><td class="mono" style="font-size:8.4px">−1,94 + 4,82·0,2103 + (-0,12) = -0,6164</td><td class="n"><b>0,3506</b></td><td class="c">0</td></tr>
+<tr><td>ảnh hồ bơi × <b>LOYALTY</b></td><td class="n">0,1502</td><td class="mono" style="font-size:8.4px">−1,94 + 4,82·0,1502 + (-0,61) = -1,8260</td><td class="n"><b>0,1387</b></td><td class="c">0</td></tr>
+</table>
+<p>Ảnh hồ bơi ủng hộ <b>AMENITY</b> (v = 0,3310) mạnh hơn FACILITY (0,3506), và gần như không ủng hộ
+<b>LOYALTY</b> (0,1387) — đúng như dự đoán: “ảnh mà khách quay lại sẽ chụp” không có nội dung thị giác rõ ràng.</p>
+<h4>Go/no-go — chốt TRƯỚC khi chạy, chống HARKing</h4>
+<table><tr><th style="width:22px">#</th><th style="width:160px">Kiểm tra</th><th style="width:60px">Ngưỡng</th>
+<th class="n" style="width:56px">Giả định<br>đo được</th><th>Vì sao ngưỡng đó</th></tr>
+<tr><td>1</td><td>AUC của verifier trên gold test</td><td class="mono">≥ 0,70</td><td class="n">0,78 ✓</td>
+<td>Sàn “ảnh có tín hiệu”</td></tr>
+<tr><td>2</td><td>ΔAUC = AUC(V) − AUC(baseline không ảnh)</td><td class="mono">≥ 0,05</td>
+<td class="n">0,78 − 0,71<br>= <b>0,07</b> ✓</td>
+<td><b>Đây mới là kiểm tra thật.</b> One-hot category tự dự đoán được y vì FACILITY có mặt ở hầu hết review.
+AUC tuyệt đối cao mà không vượt baseline nghĩa là <b>ảnh không đóng góp gì</b> — go/no-go phải dựa trên delta.</td></tr>
+<tr><td>3</td><td>Spearman(r̂, human audit 300 quad)</td><td class="mono">≥ 0,30</td><td class="n">0,41 ✓</td>
+<td>Bridge phải tương quan với <b>đánh giá người</b>, không chỉ với chính verifier</td></tr>
+</table>
+<p class="sub"><span class="badge syn">SỐ MINH HOẠ</span> — Module C <b>chưa chạy thật</b>. Nếu trượt bất kỳ
+ngưỡng nào: <span class="mono">bridge_NOGO.pkl</span> được ghi, <span class="mono">bridge.pkl</span> bị
+<b>xoá</b>, và <span class="mono">apply_weights</span> fallback <span class="mono">w = conf_seq</span> thô.
+Bài lùi về A+B+D — vẫn đủ tải một bài Q1, chỉ mất mũi nhọn Information Fusion.</p>
+<h3>7.2 C3 · bridge — “suy rộng” từ 6,24% có ảnh ra 100%</h3>
+<div class="fx">r̂(q) = g( conf_seq, p_posterior, 1[φ=POS], log(1+n_words), 1[provenance_flip] ) ≈ Pr[ V(ảnh, c<sub>q</sub>) = 1 ]
+<span class="why">g là LogisticRegression fit trên tập quad <b>có</b> <span class="mono">v_image</span>,
+nhãn nhị phân y = 1[v_image ≥ 0,5]. Điểm mấu chốt: <b>mọi feature chỉ dùng text</b> — nên r̂ áp được cho
+toàn bộ quad, kể cả ~1,03M review không ảnh. Ảnh xuất hiện ở <i>nhãn</i>, không ở <i>đặc trưng</i>.</span></div>
+<p>Thế số cho 4 quad, hệ số <span class="badge syn">SỐ MINH HOẠ</span> b = −3,02, w = [2,64 · 1,87 · 0,42 · 0,19 · −1,35]:</p>
+<table style="font-size:8.8px"><tr><th style="width:30px">Quad</th><th class="n">conf_seq</th>
+<th class="n">p_post</th><th class="c">1[POS]</th><th class="n">log(1+12)</th><th class="c">flip</th>
+<th>z = b + wᵀx</th><th class="n">r̂ = σ(z)</th></tr>
+<tr><td><b>Q1</b></td><td class="n">0,8616</td><td class="n">0,9638</td><td class="c">0</td><td class="n">2,5649</td><td class="c">0</td><td class="mono" style="font-size:7.8px">−3,02 + 2,64·0,8616 + 1,87·0,9638 + 0,42·0 + 0,19·2,5649 − 1,35·0<br>= <b>1,5442</b></td><td class="n"><b>0,8241</b></td></tr>
+<tr><td><b>Q2</b></td><td class="n">0,8616</td><td class="n">0,9787</td><td class="c">0</td><td class="n">2,5649</td><td class="c">0</td><td class="mono" style="font-size:7.8px">−3,02 + 2,64·0,8616 + 1,87·0,9787 + 0,42·0 + 0,19·2,5649 − 1,35·0<br>= <b>1,5722</b></td><td class="n"><b>0,8281</b></td></tr>
+<tr><td><b>Q3</b></td><td class="n">0,9497</td><td class="n">0,9692</td><td class="c">1</td><td class="n">2,5649</td><td class="c">0</td><td class="mono" style="font-size:7.8px">−3,02 + 2,64·0,9497 + 1,87·0,9692 + 0,42·1 + 0,19·2,5649 − 1,35·0<br>= <b>2,2070</b></td><td class="n"><b>0,9009</b></td></tr>
+<tr><td><b>Q4</b></td><td class="n">0,8616</td><td class="n">0,4159</td><td class="c">0</td><td class="n">2,5649</td><td class="c">1</td><td class="mono" style="font-size:7.8px">−3,02 + 2,64·0,8616 + 1,87·0,4159 + 0,42·0 + 0,19·2,5649 − 1,35·1<br>= <b>-0,8303</b></td><td class="n"><b>0,3036</b></td></tr>
+</table>
+<p>Hệ số <span class="mono">−1,35</span> trên <span class="mono">provenance_flip</span> là thứ đáng đọc
+nhất ở bảng này: bridge <b>học được từ ảnh</b> rằng quad bị lật cực tính thì kém đáng tin hơn hẳn —
+r̂(Q4) = 0,3036 so với ~0,82 của ba quad còn lại. Không ai lập trình quy tắc đó; nó đến từ việc ảnh nói
+“không”. Đây chính là nội dung của đóng góp Information Fusion.</p>
+<h4>IPW — bỏ là sai, không phải “tinh chỉnh”</h4>
+<table style="width:64%"><tr><th>Nhóm pool có text</th><th class="n">n</th><th class="n">Số từ TB</th><th class="n">Score TB</th></tr>
+<tr><td>Có ảnh</td><td class="n">114.988</td><td class="n">56,7</td><td class="n">8,90</td></tr>
+<tr><td>Không ảnh</td><td class="n">1.035.427</td><td class="n">36,5</td><td class="n">8,68</td></tr></table>
+<p>Gold <b>100%</b> có ảnh, pool chỉ <b>6,24%</b> → bridge được fit trên một mẫu dài hơn và hài lòng hơn mẫu
+mà nó sẽ được áp lên. Sửa bằng inverse-probability weighting:</p>
+<div class="calc">propensity: p = σ( b + w₁·log(1+n_words) + w₂·score )          <span style="color:#64748b">← P(has_photo)</span>
+w_ipw = 1 / clip(p, 0,02 , 1,0)                                <span style="color:#64748b">← clip chặn trọng số nổ</span></div>
+<table style="width:82%"><tr><th class="n">n_words</th><th class="n">score</th><th class="n">log(1+n)</th>
+<th class="n">z = −6,41 + 0,842·log(1+n) + 0,115·score</th><th class="n">p</th><th class="n">clip</th><th class="n">w_ipw</th></tr>
+<tr><td class="n">12</td><td class="n">7,50</td><td class="n">2,5649</td><td class="n">-3,3878</td><td class="n">0,03268</td><td class="n">0,0327</td><td class="n"><b>30,60</b></td></tr>
+<tr><td class="n">57</td><td class="n">8,90</td><td class="n">4,0604</td><td class="n">-1,9676</td><td class="n">0,12265</td><td class="n">0,1226</td><td class="n"><b>8,15</b></td></tr>
+<tr><td class="n">36</td><td class="n">8,68</td><td class="n">3,6109</td><td class="n">-2,3714</td><td class="n">0,08538</td><td class="n">0,0854</td><td class="n"><b>11,71</b></td></tr>
+<tr><td class="n">150</td><td class="n">9,20</td><td class="n">5,0173</td><td class="n">-1,1275</td><td class="n">0,24463</td><td class="n">0,2446</td><td class="n"><b>4,09</b></td></tr>
+</table>
+<p>Đọc: review ngắn (12 từ) gần như chắc chắn <b>không</b> có ảnh (p = 0,03268) nên nếu nó <i>có</i> ảnh thì
+nó đại diện cho rất nhiều review giống nó → trọng số bị <b>clip ở 0,02</b> thành w = 50, tức là mức trần.
+Review dài 150 từ có p = 0,2446 nên chỉ mang trọng số 4,09. Không có clip thì một vài review ngắn hiếm hoi sẽ
+chiếm gần hết trọng số của cả bridge.</p>
+<p class="sub">Bridge được fit <b>hai bản</b>: có IPW (<span class="mono">bridge</span>) và không IPW
+(<span class="mono">bridge_noipw</span>) — để báo cáo có/không hiệu chỉnh. Bản dùng cho
+<span class="mono">apply</span> là bản <b>có</b> IPW.</p>
+<h3>7.3 C4 · apply — <span class="mono">w</span> cho mọi quad</h3>
+<div class="fx">w<sub>q</sub> = 1[taxonomy hợp lệ] · 1[span hợp lệ] · r̂(q)</div>
+<table style="width:74%"><tr><th style="width:30px">Quad</th><th class="n">1[tax]</th><th class="n">r̂</th>
+<th class="n">w</th><th>Ghi chú</th></tr>
+<tr><td><b>Q1</b></td><td class="n">1,0</td><td class="n">0,8241</td><td class="n"><b>0,8241</b></td><td>FAC_ROOM ∈ CODE2CAT ✓</td></tr>
+<tr><td><b>Q2</b></td><td class="n">1,0</td><td class="n">0,8281</td><td class="n"><b>0,8281</b></td><td>AM_FOOD ∈ CODE2CAT ✓</td></tr>
+<tr><td><b>Q3</b></td><td class="n">1,0</td><td class="n">0,9009</td><td class="n"><b>0,9009</b></td><td>SER_ATTITUDE ∈ CODE2CAT ✓ — w cao nhất</td></tr>
+<tr><td><b>Q4</b></td><td class="n">1,0</td><td class="n">0,3036</td><td class="n"><b>0,3036</b></td><td>AM_POOL ∈ CODE2CAT ✓ nhưng r̂ thấp → <b>đóng góp vào Module D chỉ 37% so với Q1</b></td></tr>
+</table>
+<div class="item warn"><div class="hd">Trạng thái cài đặt <span class="badge p2">LỆCH</span></div>
+<p>Code hiện chỉ tính <span class="mono">hard = 1.0 if taxonomy_code in CODE2CAT else 0.0</span> —
+<b>chỉ có thành phần taxonomy</b>. <span class="mono">1[span hợp lệ]</span> <b>chưa được cài</b>
+(span của pool quad chưa được kiểm tra lại với text). Ngoài ra fallback khi NO-GO là
+<span class="mono">conf_seq</span> <b>thô</b>, <b>không</b> temperature-scale — đừng mô tả nó là
+“conf_seq đã calibrate”. Mỗi dòng ra mang <span class="mono">w_source</span> để Module D truy vết.</p></div>
+<div class="pb"></div>
+<h2>§8 · Module D — toàn bộ máy drift, chạy trên mini-corpus 24 kỳ</h2>
+<p class="lead" style="margin-top:2px"><b>Mini-corpus.</b> 24 kỳ tháng (2022-03 → 2024-02) ·
+2 stratum (<span class="mono">VN</span>, <span class="mono">WEST</span>) · 5 aspect. Dựng có chủ đích để
+<b>cả năm nhãn verdict cùng xuất hiện</b> — điều một corpus thật hiếm khi cho trong 5 aspect.
+<span class="badge syn">SỐ MINH HOẠ</span> cho dữ liệu, nhưng <b>mọi phép tính dưới đây chạy qua đúng các hàm
+trong <span class="mono">module_d_drift.py</span></b>. Dữ liệu đầy đủ ở Phụ lục A.</p>
+<div class="calc">Thiết kế của mini-corpus — hai thứ trôi cùng lúc, đúng như dữ liệu thật:
+  (a) THÀNH PHẦN trôi mạnh:  Σw(VN)  900 → 200      Σw(WEST)  100 → 800
+      (mô phỏng reviewer Việt Nam 89,7%% → 16,1%% trong dữ liệu thật)
+  (b) Mỗi stratum có xu hướng NỘI TẠI riêng, và hai stratum phàn nàn khác nhau:
+      AM_FOOD : VN 7,0%% → 6,0%%   WEST 20,0%% → 17,0%%    ← WEST chê đồ ăn GẤP 3 LẦN VN
+      AM_WIFI : VN 19,0%% → 23,0%%  WEST 13,3%% → 17,3%%    ← tăng thật, cùng biên độ +4,0 điểm
+      AM_POOL : VN 10,0%% → 13,0%%  WEST  5,7%% →  8,7%%    ← tăng thật, cùng biên độ +3,0 điểm
+      FAC_ROOM: VN 28,0%% → 22,0%%  WEST 27,0%% → 21,0%%    ← giảm thật, hai stratum GIỐNG nhau
+      SER_ATT : phần còn lại
+  + mùa vụ trên AM_FOOD (đỉnh tháng 7, biên độ ±1,2 điểm %%) + nhiễu log-normal sd = 0,08</div>
+<h3>8.1 <span class="mono">load_quads</span> — ba cấu trúc, và định nghĩa “lượt phàn nàn”</h3>
+<div class="calc">cell [(period, stratum)][aspect]              = Σ w    <span style="color:#64748b"># kênh π — CHỈ quad complaint</span>
+vcell[(period, stratum)][aspect][sentiment]  = Σ w    <span style="color:#64748b"># kênh ν — MỌI quad</span>
+reviews[(period, stratum)] = [(review_uid, {aspect: w}), …]   <span style="color:#64748b"># cho bootstrap</span>
+
+“lượt phàn nàn”  ⇔  q["phi"] == "NEG"  <b>or</b>  q["sentiment"] == "negative"     ← HỢP của hai điều kiện
+w = q.get("w", q.get("conf_seq", 1.0))  ;  w ≤ 0 → bỏ quad
+code ∉ CODES_REPORTABLE → tự gộp lên category cha (CODE2CAT)</div>
+<p>Áp lên 4 quad của review ví dụ (kỳ <span class="mono">2023-09</span>, stratum
+<span class="mono">(VN, Cặp đôi)</span>):</p>
+<table style="width:88%"><tr><th style="width:30px">Quad</th><th style="width:74px">aspect</th>
+<th class="n">w</th><th class="c">φ</th><th>sentiment</th><th class="c">vào <b>cell</b> (π)?</th><th>vào <b>vcell</b> (ν)</th></tr>
+<tr><td><b>Q1</b></td><td class="mono">FAC_ROOM</td><td class="n">0,8241</td><td class="c mono">NEG</td><td>negative</td><td class="c"><b style="color:#15803d">✔ +0,8241</b></td><td class="mono" style="font-size:8.2px">[FAC_ROOM][negative] += 0,8241</td></tr>
+<tr><td><b>Q2</b></td><td class="mono">AM_FOOD</td><td class="n">0,8281</td><td class="c mono">NEG</td><td>negative</td><td class="c"><b style="color:#15803d">✔ +0,8281</b></td><td class="mono" style="font-size:8.2px">[AM_FOOD][negative] += 0,8281</td></tr>
+<tr><td><b>Q3</b></td><td class="mono">SER_ATTITUDE</td><td class="n">0,9009</td><td class="c mono">POS</td><td>positive</td><td class="c">—</td><td class="mono" style="font-size:8.2px">[SER_ATTITUDE][positive] += 0,9009</td></tr>
+<tr><td><b>Q4</b></td><td class="mono">AM_POOL</td><td class="n">0,3036</td><td class="c mono">NEG</td><td>negative</td><td class="c"><b style="color:#15803d">✔ +0,3036</b></td><td class="mono" style="font-size:8.2px">[AM_POOL][negative] += 0,3036</td></tr>
+</table>
+<div class="item info"><div class="hd">Vì sao “lượt phàn nàn” là <b>hợp</b> của hai điều kiện</div>
+<p>Q3 (“Nhân viên nhiệt tình”, φ=POS, positive) <b>không</b> vào kênh π — đúng, nó không phải lời phàn nàn.
+Q4 (“hồ bơi ổn”, φ=NEG, posterior negative) <b>có</b> vào — cũng đúng, nó nằm trong ô “chưa hài lòng”.
+Nếu chỉ dùng <span class="mono">sentiment == "negative"</span> thì mất toàn bộ lời chê được viết bằng giọng
+trung tính; nếu chỉ dùng <span class="mono">phi == "NEG"</span> thì mất lời chê nằm lạc trong ô điểm cộng.
+Cả hai kiểu đều có thật và cả hai đều là phàn nàn.</p></div>
+<h3>8.2 <span class="mono">reference_composition</span> — thành phần tham chiếu cố định</h3>
+<div class="fx">π<sup>ref</sup><sub>g</sub> = (tổng w của stratum g trên <b>toàn bộ 24 kỳ</b>) / (tổng w toàn corpus)
+<span class="why">Một thành phần <b>cố định</b>, không đổi theo kỳ — đó chính là điều làm cho direct
+standardization trả lời được câu hỏi “<i>nếu thành phần khách không đổi thì…</i>”.</span></div>
+<table style="width:56%"><tr><th>stratum g</th><th class="n">Σw toàn 24 kỳ</th><th class="n">π<sup>ref</sup><sub>g</sub></th></tr>
+<tr><td><span class="mono">(VN, Cặp đôi)</span></td><td class="n">13338,2</td><td class="n"><b>0,5535</b></td></tr>
+<tr><td><span class="mono">(WEST, Cặp đôi)</span></td><td class="n">10759,6</td><td class="n"><b>0,4465</b></td></tr>
+<tr><th>tổng</th><th class="n">24097,9</th><th class="n">1,0000</th></tr></table>
+<h3>8.3 Kênh π — <span class="mono">shares_by_period</span>, thế số đầy đủ cho kỳ 2022-03</h3>
+<h4>Bước 1 — ô thô</h4>
+<table><tr><th style="width:110px">(2022-03, stratum)</th><th class="n">AM_FOOD</th><th class="n">AM_WIFI</th><th class="n">AM_POOL</th><th class="n">FAC_ROOM</th><th class="n">SER_ATTITUDE</th><th class="n">Σ</th></tr>
+<tr><td><span class="mono">(VN, Cặp đôi)</span></td><td class="n">56,433</td><td class="n">167,935</td><td class="n">83,547</td><td class="n">275,443</td><td class="n">357,889</td><td class="n"><b>941,247</b></td></tr>
+<tr><td><span class="mono">(WEST, Cặp đôi)</span></td><td class="n">20,022</td><td class="n">11,640</td><td class="n">5,936</td><td class="n">23,583</td><td class="n">32,223</td><td class="n"><b>93,404</b></td></tr>
+<tr style="background:#eef2f7"><td><b>pooled</b> (cộng 2 stratum)</td><td class="n"><b>76,455</b></td><td class="n"><b>179,575</b></td><td class="n"><b>89,483</b></td><td class="n"><b>299,026</b></td><td class="n"><b>390,112</b></td><td class="n"><b>1034,651</b></td></tr></table>
+<h4>Bước 2 — π<sup>raw</sup>: chỉ chuẩn hoá pooled</h4>
+<div class="calc">π^raw_{a,t} = pooled_{a,t} / Σ_{a'} pooled_{a',t}
+
+  AM_FOOD        76,455 / 1034,651 = <b>0,07389</b>
+
+  AM_WIFI        179,575 / 1034,651 = <b>0,17356</b>
+
+  AM_POOL        89,483 / 1034,651 = <b>0,08649</b>
+
+  FAC_ROOM       299,026 / 1034,651 = <b>0,28901</b>
+
+  SER_ATTITUDE   390,112 / 1034,651 = <b>0,37705</b>
+
+  Σ =            1,00000
+</div>
+<h4>Bước 3 — π<sup>adj</sup>: direct standardization + shrinkage Dirichlet</h4>
+<div class="fx">π̃<sub>a,t</sub> ∝ Σ<sub>g</sub> π<sup>ref</sup><sub>g</sub> · ( n<sub>a,t,g</sub> + m·s0<sub>a,t</sub> ) / ( n<sub>·,t,g</sub> + m ),&nbsp;&nbsp; m = --min-stratum = 30
+<span class="why"><b>s0<sub>a,t</sub> = π<sup>raw</sup><sub>a,t</sub></b> (share gộp của chính kỳ đó) đóng vai
+trò prior. Ô nhỏ <b>không bị loại</b> mà bị kéo về share gộp của kỳ — ô rỗng đóng góp đúng share gộp, tức
+là <b>trung tính</b>. <br><b>Vì sao đổi từ “loại ô n&lt;30”:</b> loại ô đột ngột làm mix strata <i>đóng góp</i>
+tự trôi theo thời gian khi một stratum teo dần → sinh trend giả <b>ngay trong kênh adj</b>. Đã tái hiện
+được bằng composition injection trên nền null.</span></div>
+<div class="calc">m = 30 ;  n_·,t,VN = 941,247 → mẫu số = 941,247 + 30 = 971,247
+                n_·,t,WEST = 93,404 → mẫu số = 93,404 + 30 = 123,404
+
+
+  aspect          sh_VN = (n_VN + 30·s0)/971,2    sh_WEST = (n_W + 30·s0)/123,4    acc = 0,5535·sh_VN + 0,4465·sh_WEST
+
+  AM_FOOD        (56,43 + 30·0,07389)/971,2 = 0,06039   (20,02 + 30·0,07389)/123,4 = 0,18021   → 0,11389
+
+  AM_WIFI        (167,94 + 30·0,17356)/971,2 = 0,17827   (11,64 + 30·0,17356)/123,4 = 0,13652   → 0,15963
+
+  AM_POOL        (83,55 + 30·0,08649)/971,2 = 0,08869   (5,94 + 30·0,08649)/123,4 = 0,06913   → 0,07996
+
+  FAC_ROOM       (275,44 + 30·0,28901)/971,2 = 0,29252   (23,58 + 30·0,28901)/123,4 = 0,26136   → 0,27861
+
+  SER_ATTITUDE   (357,89 + 30·0,37705)/971,2 = 0,38013   (32,22 + 30·0,37705)/123,4 = 0,35278   → 0,36792
+
+
+  Σ acc = 1,00000  →  chuẩn hoá lại:
+
+  AM_FOOD        0,11389 / 1,00000 = <b>0,11389</b>
+
+  AM_WIFI        0,15963 / 1,00000 = <b>0,15963</b>
+
+  AM_POOL        0,07996 / 1,00000 = <b>0,07996</b>
+
+  FAC_ROOM       0,27861 / 1,00000 = <b>0,27861</b>
+
+  SER_ATTITUDE   0,36792 / 1,00000 = <b>0,36792</b>
+
+</div>
+<table style="width:88%"><tr><th>aspect</th><th class="n">π<sup>raw</sup></th><th class="n">π<sup>adj</sup></th>
+<th class="n">chênh</th><th>Đọc</th></tr>
+<tr><td class="mono">AM_FOOD</td><td class="n">7,39%</td><td class="n"><b>11,39%</b></td><td class="n" style="color:#15803d">+4,00 đ%</td><td>WEST chê đồ ăn gấp 3× VN, mà 2022-03 WEST chỉ chiếm 9%; đứng theo thành phần tham chiếu (44,6% WEST) thì <b>share thật cao hơn nhiều</b></td></tr>
+<tr><td class="mono">AM_WIFI</td><td class="n">17,36%</td><td class="n"><b>15,96%</b></td><td class="n" style="color:#b91c1c">−1,39 đ%</td><td>VN chê wifi nhiều hơn WEST → raw bị VN kéo lên, adj hạ xuống</td></tr>
+<tr><td class="mono">AM_POOL</td><td class="n">8,65%</td><td class="n"><b>8,00%</b></td><td class="n" style="color:#b91c1c">−0,65 đ%</td><td>VN chê hồ bơi nhiều hơn WEST → adj hạ xuống</td></tr>
+<tr><td class="mono">FAC_ROOM</td><td class="n">28,90%</td><td class="n"><b>27,86%</b></td><td class="n" style="color:#b91c1c">−1,04 đ%</td><td>hai stratum gần như giống nhau → hiệu chỉnh gần như không đổi gì</td></tr>
+<tr><td class="mono">SER_ATTITUDE</td><td class="n">37,70%</td><td class="n"><b>36,79%</b></td><td class="n" style="color:#b91c1c">−0,91 đ%</td><td>gần giống nhau → đổi rất ít</td></tr>
+</table>
+<div class="item keep"><div class="hd">Đây là toàn bộ ý tưởng của D-b, trong một dòng</div>
+<p>Ở kỳ 2022-03, phân tích thô nói “đồ ăn chiếm 7,39% lượt phàn nàn”. Nhưng con số đó chỉ đúng
+<i>cho tập khách của tháng đó</i> — 91% là VN, và VN vốn ít chê đồ ăn. Hỏi câu khác — “<i>nếu tập khách
+giống thành phần trung bình của cả 24 kỳ thì sao?</i>” — câu trả lời là <b>11,39%</b>. Chênh
+<b>4,00 điểm phần trăm</b> ấy <u>không phải</u> thay đổi của khách sạn; nó là thay đổi của <u>người viết review</u>.
+Toàn bộ §8.7–§8.11 tồn tại để tách hai thứ đó ra.</p></div>
+<h3>8.4 CLR — vì sao không hồi quy thẳng trên share</h3>
+<div class="fx">clr(p)<sub>a</sub> = log ( p<sub>a</sub> / (∏<sub>a'</sub> p<sub>a'</sub>)<sup>1/K</sup> ),&nbsp;&nbsp; sau khi kẹp p<sub>a</sub> ≥ ε = 10⁻⁶
+<span class="why">Các share cộng lại = 1, nên <b>một aspect tăng thì các aspect khác buộc phải giảm</b> →
+hồi quy trực tiếp trên share sinh tương quan âm <b>giả</b> và vi phạm ràng buộc simplex. CLR đưa từ simplex
+về không gian thực (tổng các thành phần clr = 0 — có unit test kiểm chứng) và hiệu log-ratio
+<b>bất biến với tổng khối lượng</b> — đúng thứ cần khi số hotel/tháng tăng 15,6×.</span></div>
+<div class="calc">Kỳ 2022-03, kênh adj. Trung bình nhân:
+  g = (∏ p_a)^(1/5) = (0,11389 · 0,15963 · 0,07996 · 0,27861 · 0,36792)^(1/5) = <b>0,171647</b>
+
+
+  clr[AM_FOOD       ] = log(0,11389 / 0,171647) = <b>-0,4102</b>
+
+  clr[AM_WIFI       ] = log(0,15963 / 0,171647) = <b>-0,0726</b>
+
+  clr[AM_POOL       ] = log(0,07996 / 0,171647) = <b>-0,7640</b>
+
+  clr[FAC_ROOM      ] = log(0,27861 / 0,171647) = <b>0,4844</b>
+
+  clr[SER_ATTITUDE  ] = log(0,36792 / 0,171647) = <b>0,7624</b>
+
+
+  Σ clr = 0,000000000   ← BẤT BIẾN: tổng các thành phần CLR luôn = 0
+</div>
+<h3>8.5 Khử mùa vụ — <span class="mono">deseason</span></h3>
+<div class="fx">y′<sub>t</sub> = y<sub>t</sub> − ( mean(các kỳ cùng tháng-trong-năm với t) − mean(toàn chuỗi) )
+<span class="why">Bắt buộc, không tuỳ chọn: biên độ mùa của FAC_CLIMATE / AM_POOL lớn gấp <b>~4×</b> aspect
+khác. Không khử thì một cửa sổ so sánh đặt lệch mùa sẽ <b>tự sinh ra “drift”</b>.</span></div>
+<div class="calc">Ví dụ tháng 03 trong chuỗi clr(π^adj) của AM_FOOD (24 kỳ ⇒ mỗi tháng xuất hiện ĐÚNG 2 lần):
+  các kỳ tháng 03: 2022-03 → -0,4102 ;  2023-03 → -0,5265
+  mean(tháng 03)  = (-0,4102 + -0,5265)/2 = <b>-0,4684</b>
+  mean(toàn chuỗi) = <b>-0,4143</b>
+  hiệu ứng tháng 03 = -0,4684 − -0,4143 = <b>-0,0540</b>
+
+  y′(2022-03) = -0,4102 − (-0,0540) = <b>-0,3562</b>
+  y′(2023-03) = -0,5265 − (-0,0540) = <b>-0,4725</b></div>
+<div class="item bad"><div class="hd">Cạm bẫy chết người: chuỗi đúng 12 kỳ thì <span class="mono">deseason</span> <u>xoá sạch</u> chuỗi</div>
+<p>Nếu chuỗi có đúng 12 kỳ, mỗi tháng xuất hiện <b>đúng một lần</b> → <span class="mono">mean(tháng của t) =
+y<sub>t</sub></span> → <span class="mono">y′<sub>t</sub> = y<sub>t</sub> − (y<sub>t</sub> − gm) = gm</span>
+với <b>mọi</b> t. Chuỗi thành hằng số, slope = 0, t = 0, <b>không phát hiện được gì cả</b> — và không có
+warning nào. Đây chính là lý do <span class="mono">channel_stats</span> đặt sàn <b>≥ 12 điểm</b> chứ thực chất
+phải <b>&gt; 12</b>: cửa sổ thật của bài là <b>36 kỳ</b> (mỗi tháng 3 lần), mini-corpus này dùng <b>24</b>
+(mỗi tháng 2 lần). Đừng bao giờ chạy Module D trên đúng một năm dữ liệu.</p></div>
+<h3>8.6 OLS + t — <span class="mono">ols_trend</span></h3>
+<div class="calc">b = Σ(xᵢ−x̄)(yᵢ−ȳ) / Σ(xᵢ−x̄)²          x = chỉ số kỳ 0…23
+slope_per_year = b × 12                   <span style="color:#64748b"># quy về mỗi NĂM</span>
+se = sqrt( Σrᵢ² / (n−2) / Σ(xᵢ−x̄)² )      <span style="color:#64748b"># df = n−2</span>
+t  = b / se</div>
+<div class="calc">AM_FOOD, kênh π-adj, sau khi khử mùa:
+  n = 24 ;  x̄ = 11,5 ;  ȳ = -0,41433
+  Σ(xᵢ−x̄)² = 1150,0
+  Σ(xᵢ−x̄)(yᵢ−ȳ) = -3,90648
+  b = -3,90648 / 1150,0 = -0,003397        → slope_per_year = -0,003397 × 12 = <b>-0,0408</b>
+  Σrᵢ² = 0,01992  → se = sqrt(0,01992 / 22 / 1150,0) = 0,000887
+  t = -0,003397 / 0,000887 = <b>-3,83</b></div>
+<h3>8.7 Changepoint — <span class="mono">best_split</span> + Welch-t</h3>
+<div class="calc">c* = argmax_c | welch_t( y′[0:c] , y′[c:] ) |      với c ∈ [4, T−4)   ← tối thiểu 4 điểm MỖI PHÍA
+welch_t(a,b) = (mean a − mean b) / sqrt( var a/nₐ + var b/n_b )    (var chia n−1)</div>
+<p>Ràng buộc “≥4 điểm mỗi phía” là để <b>không bắt changepoint ở hai biên</b> — chỗ mà một điểm lạ đơn lẻ
+có thể tạo ra Welch-t khổng lồ. Kết quả trên mini-corpus:</p>
+<table style="width:84%"><tr><th>aspect</th><th class="c">changepoint (π-adj)</th><th class="n">welch_t</th>
+<th class="n">p_perm_changepoint</th><th>Đọc</th></tr>
+<tr><td class="mono">AM_FOOD</td><td class="c">2023-03</td><td class="n">5,00</td><td class="n">0,01898</td><td>bước nhảy rõ</td></tr>
+<tr><td class="mono">AM_WIFI</td><td class="c">2023-03</td><td class="n">3,40</td><td class="n">0,11189</td><td>không có bước nhảy đáng kể</td></tr>
+<tr><td class="mono">AM_POOL</td><td class="c">2023-03</td><td class="n">9,44</td><td class="n">0,00100</td><td>bước nhảy rõ</td></tr>
+<tr><td class="mono">FAC_ROOM</td><td class="c">2023-03</td><td class="n">6,09</td><td class="n">0,00699</td><td>bước nhảy rõ</td></tr>
+<tr><td class="mono">SER_ATTITUDE</td><td class="c">2022-08</td><td class="n">5,10</td><td class="n">0,01598</td><td>bước nhảy rõ</td></tr>
+</table>
+<div class="item warn"><div class="hd">Hai kiểm định KHÁC NHAU — đừng đọc lẫn <span class="badge p2">đã sửa</span></div>
+<p><span class="mono">p_perm</span> là p của thống kê <b>TREND</b> (khớp với <span class="mono">slope_per_year</span>
+/ <span class="mono">t_stat</span> được báo cáo, và là cái đi vào BH-FDR và verdict).
+<span class="mono">p_perm_changepoint</span> là p của <b>BƯỚC NHẢY</b>, báo cáo riêng.<br>
+<b>Bản cũ</b> chỉ permute thống kê changepoint rồi in p đó <i>cạnh</i> slope OLS — nên
+<span class="mono">significant_after_fdr</span> thực chất nói “có bước nhảy” trong khi verdict lại gate trên
+<i>dấu slope</i>: aspect trôi đơn điệu mạnh mà không có bước nhảy bị gọi là “phẳng”, còn bước nhảy sạch
+với slope ≈ 0 lại được gọi là “XU HƯỚNG THẬT”.</p></div>
+<h3>8.8 Permutation — null <u>riêng cho từng chuỗi</u></h3>
+<div class="calc">for _ in range(n_perm):                 <span style="color:#64748b"># n_perm = 1000</span>
+    sh = series[:] ; rng.shuffle(sh)    <span style="color:#64748b"># xáo THỨ TỰ THỜI GIAN, giữ nguyên TẬP GIÁ TRỊ</span>
+    de = deseason(sh, periods)          <span style="color:#64748b"># khử mùa LẠI trên bản đã xáo</span>
+    if |t_trend(de)| ≥ |t_obs| : hit_trend += 1
+    if  t_cp(de)    ≥  t_cp_obs: hit_cp    += 1
+p = (hit + 1) / (n_perm + 1)            <span style="color:#64748b"># +1 hai vế ⇒ p KHÔNG BAO GIỜ bằng 0</span></div>
+<p><b>Vì sao null phải riêng từng chuỗi, không dùng bảng t chuẩn.</b> Chuỗi share theo thời gian có
+tự tương quan, có phương sai rất khác nhau giữa các aspect (AM_POOL nhiễu hơn FAC_ROOM nhiều), và đã qua
+hai phép biến đổi phi tuyến (CLR, deseason). Phân phối của t dưới giả thuyết “không có xu hướng” vì thế
+<b>không</b> là Student-t, và <b>khác nhau rõ rệt giữa các aspect</b>. Xáo chính chuỗi đó cho ta phân phối
+null đúng của nó.</p>
+<table style="width:76%"><tr><th>aspect · kênh</th><th class="n">|t| quan sát</th>
+<th class="n">hit / 1000</th><th class="n">p_perm</th></tr>
+<tr><td><span class="mono">AM_FOOD</span> · π-adj</td><td class="n">3,83</td><td class="n">6</td><td class="n">0,00699</td></tr>
+<tr><td><span class="mono">AM_FOOD</span> · ν-adj</td><td class="n">2,81</td><td class="n">28</td><td class="n">0,02897</td></tr>
+<tr><td><span class="mono">AM_WIFI</span> · π-adj</td><td class="n">2,77</td><td class="n">32</td><td class="n">0,03297</td></tr>
+<tr><td><span class="mono">AM_WIFI</span> · ν-adj</td><td class="n">0,95</td><td class="n">478</td><td class="n">0,47852</td></tr>
+<tr><td><span class="mono">AM_POOL</span> · π-adj</td><td class="n">5,78</td><td class="n">0</td><td class="n">0,00100</td></tr>
+<tr><td><span class="mono">AM_POOL</span> · ν-adj</td><td class="n">0,21</td><td class="n">866</td><td class="n">0,86613</td></tr>
+<tr><td><span class="mono">FAC_ROOM</span> · π-adj</td><td class="n">4,43</td><td class="n">3</td><td class="n">0,00400</td></tr>
+<tr><td><span class="mono">FAC_ROOM</span> · ν-adj</td><td class="n">4,90</td><td class="n">2</td><td class="n">0,00300</td></tr>
+<tr><td><span class="mono">SER_ATTITUDE</span> · π-adj</td><td class="n">0,27</td><td class="n">838</td><td class="n">0,83816</td></tr>
+<tr><td><span class="mono">SER_ATTITUDE</span> · ν-adj</td><td class="n">0,51</td><td class="n">670</td><td class="n">0,67033</td></tr>
+</table>
+<h3>8.9 BH-FDR — hai lưới, và kiểm tra n_perm có đủ không</h3>
+<div class="calc">q(i) = min( q(i+1) , p(i)·n/i )   quét từ p LỚN NHẤT xuống, kẹp ≤ 1   ← step-up có monotone enforcement
+
+Lưới CHÍNH (adj): π-adj ∪ ν-adj trên mọi aspect = 5 × 2 = <b>10</b> giả thuyết
+Lưới raw riêng  : π-raw ∪ ν-raw = 10 giả thuyết — CHỈ để so like-for-like trong injection E3a</div>
+<h4>Ví dụ độc lập cho thuật toán BH (dễ kiểm tay)</h4>
+<table style="width:72%"><tr><th>i (hạng)</th><th class="n">1</th><th class="n">2</th><th class="n">3</th><th class="n">4</th><th class="n">5</th><th class="n">6</th></tr>
+<tr><td>p(i) đã sắp tăng</td><td class="n">0,001</td><td class="n">0,012</td><td class="n">0,030</td><td class="n">0,041</td><td class="n">0,200</td><td class="n">0,640</td></tr>
+<tr><td>p(i)·n/i, n = 6</td><td class="n">0,0060</td><td class="n">0,0360</td><td class="n">0,0600</td><td class="n">0,0615</td><td class="n">0,2400</td><td class="n">0,6400</td></tr>
+<tr style="background:#eef2f7"><td><b>q(i) sau monotone</b></td><td class="n"><b>0,0060</b></td><td class="n"><b>0,0360</b></td><td class="n"><b>0,0600</b></td><td class="n"><b>0,0615</b></td><td class="n"><b>0,2400</b></td><td class="n"><b>0,6400</b></td></tr>
+<tr><td>q ≤ 0,05?</td><td class="n">✓</td><td class="n">✓</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td></tr></table>
+<p class="sub">Chú ý hạng 3: p·n/i = 0,0600 nhưng hạng 4 cho 0,0615 — <b>không</b> monotone, nên bước
+quét-ngược giữ q(3) = min(0,0615 ; 0,0600) = 0,0600. Thiếu bước này thì q có thể giảm khi p tăng.</p>
+<h4>Lưới adj thật của mini-corpus (m = 10)</h4>
+<table><tr><th class="c" style="width:26px">hạng i</th><th>giả thuyết</th><th class="n">p_perm</th>
+<th class="n">p·m/i</th><th class="n">q (p_fdr)</th><th class="c">q ≤ 0,05</th></tr>
+<tr style="background:#f0fdf4"><td class="c">1</td><td><span class="mono">AM_POOL</span> · π-adj</td><td class="n">0,00100</td><td class="n">0,01000</td><td class="n"><b>0,01000</b></td><td class="c"><b style="color:#15803d">✓</b></td></tr>
+<tr style="background:#f0fdf4"><td class="c">2</td><td><span class="mono">FAC_ROOM</span> · ν-adj</td><td class="n">0,00300</td><td class="n">0,01500</td><td class="n"><b>0,01333</b></td><td class="c"><b style="color:#15803d">✓</b></td></tr>
+<tr style="background:#f0fdf4"><td class="c">3</td><td><span class="mono">FAC_ROOM</span> · π-adj</td><td class="n">0,00400</td><td class="n">0,01333</td><td class="n"><b>0,01333</b></td><td class="c"><b style="color:#15803d">✓</b></td></tr>
+<tr style="background:#f0fdf4"><td class="c">4</td><td><span class="mono">AM_FOOD</span> · π-adj</td><td class="n">0,00699</td><td class="n">0,01747</td><td class="n"><b>0,01747</b></td><td class="c"><b style="color:#15803d">✓</b></td></tr>
+<tr><td class="c">5</td><td><span class="mono">AM_FOOD</span> · ν-adj</td><td class="n">0,02897</td><td class="n">0,05794</td><td class="n"><b>0,05495</b></td><td class="c">✗</td></tr>
+<tr><td class="c">6</td><td><span class="mono">AM_WIFI</span> · π-adj</td><td class="n">0,03297</td><td class="n">0,05495</td><td class="n"><b>0,05495</b></td><td class="c">✗</td></tr>
+<tr><td class="c">7</td><td><span class="mono">AM_WIFI</span> · ν-adj</td><td class="n">0,47852</td><td class="n">0,68360</td><td class="n"><b>0,68360</b></td><td class="c">✗</td></tr>
+<tr><td class="c">8</td><td><span class="mono">SER_ATTITUDE</span> · ν-adj</td><td class="n">0,67033</td><td class="n">0,83791</td><td class="n"><b>0,83791</b></td><td class="c">✗</td></tr>
+<tr><td class="c">9</td><td><span class="mono">SER_ATTITUDE</span> · π-adj</td><td class="n">0,83816</td><td class="n">0,93129</td><td class="n"><b>0,86613</b></td><td class="c">✗</td></tr>
+<tr><td class="c">10</td><td><span class="mono">AM_POOL</span> · ν-adj</td><td class="n">0,86613</td><td class="n">0,86613</td><td class="n"><b>0,86613</b></td><td class="c">✗</td></tr>
+</table>
+<div class="item info"><div class="hd">Kiểm tra n_perm có đủ cho lưới FDR không — một phép tính bắt buộc</div>
+<div class="calc">p sàn của permutation: f = 1/(n_perm+1) = 1/1001 = 0,00100
+q nhỏ nhất đạt được ở hạng k: f·m/k  →  NGƯỠNG PHỤ THUỘC SỐ HIỆU ỨNG THẬT, không phải hằng số
+
+  • 1 aspect drift ĐƠN LẺ (k=1): cần f·m ≤ α  ⟺  n_perm ≥ m/α − 1 = 10/0,05 − 1 = <b>199</b>
+  • j aspect cùng drift (k=j)  : cần f·m/j ≤ α  → dễ hơn j lần
+
+n_perm = 1000 ≥ 199 ✓   → phát hiện được cả hiệu ứng ĐƠN LẺ
+nếu chạy n_perm = 100: f·m = 0,0990 &gt; 0,05 ✗ → một aspect drift đơn lẻ KHÔNG THỂ vượt FDR</div>
+<p>Vì j không biết trước, <b>phải chuẩn bị cho k = 1</b> — trường hợp quan trọng nhất và khó nhất:
+<i>một aspect trôi giữa nhiều aspect phẳng</i>. Đây chính xác là ca mà bài muốn phát hiện. Code log ERROR
+khi không đạt, và <span class="mono">--final</span> thì dừng hẳn.</p></div>
+<h3>8.10 Verdict — bảng kết quả của mini-corpus</h3>
+<table style="width:74%"><tr><th style="width:150px">Nhãn</th><th>Điều kiện</th><th>Đọc thế nào</th></tr>
+<tr><td class="vd vd-that">XU HƯỚNG THẬT</td><td>adj sig ∧ raw sig ∧ <b>cùng dấu</b></td>
+    <td>Xu hướng tồn tại và không phải artifact thành phần</td></tr>
+<tr><td class="vd vd-gia">GIẢ (do thành phần)</td><td>raw sig ∧ ¬adj sig</td>
+    <td>Phân tích thô sẽ báo cáo <b>sai</b> — đây là ca Module D <b>loại bỏ</b></td></tr>
+<tr><td class="vd vd-che">BỊ CHE, lộ ra sau hiệu chỉnh</td><td>adj sig ∧ ¬raw sig</td>
+    <td>Tín hiệu thật bị thành phần che — ca Module D <b>phát hiện thêm</b></td></tr>
+<tr><td class="vd vd-dao">ĐẢO DẤU sau hiệu chỉnh</td><td>adj sig ∧ raw sig ∧ <b>trái dấu</b></td>
+    <td>Kết luận đảo chiều hoàn toàn</td></tr>
+<tr><td class="vd vd-phang">phẳng</td><td>còn lại</td><td>Không kết luận</td></tr></table>
+<table style="font-size:8.7px"><tr><th rowspan="2" style="width:74px">aspect</th>
+<th colspan="4" class="c" style="background:#e0e7ff">kênh π — share-of-complaints (thang CLR)</th>
+<th colspan="4" class="c" style="background:#fce7f3">kênh ν — negativity rate</th></tr>
+<tr><th class="n">raw slope<br>(t)</th><th class="n">q</th><th class="n">adj slope<br>(t)</th><th class="n">q</th>
+<th class="n">raw slope<br>(t)</th><th class="n">q</th><th class="n">adj slope<br>(t)</th><th class="n">q</th></tr>
+<tr><td class="mono"><b>AM_FOOD</b></td><td class="n">+0,1968<br><span style="font-size:7.6px;color:#64748b">(t=+7,29)</span></td><td class="n" style="color:#15803d">0,0050 ✓</td><td class="n">−0,0408<br><span style="font-size:7.6px;color:#64748b">(t=−3,83)</span></td><td class="n" style="color:#15803d">0,0175 ✓</td><td class="n">+0,0507<br><span style="font-size:7.6px;color:#64748b">(t=+5,95)</span></td><td class="n" style="color:#15803d">0,0050 ✓</td><td class="n">+0,0111<br><span style="font-size:7.6px;color:#64748b">(t=+2,81)</span></td><td class="n" style="color:#94a3b8">0,0549</td></tr>
+<tr><td class="mono"><b>AM_WIFI</b></td><td class="n">−0,0412<br><span style="font-size:7.6px;color:#64748b">(t=−2,72)</span></td><td class="n" style="color:#94a3b8">0,0779</td><td class="n">+0,0424<br><span style="font-size:7.6px;color:#64748b">(t=+2,77)</span></td><td class="n" style="color:#94a3b8">0,0549</td><td class="n">+0,0041<br><span style="font-size:7.6px;color:#64748b">(t=+0,80)</span></td><td class="n" style="color:#94a3b8">0,7635</td><td class="n">+0,0042<br><span style="font-size:7.6px;color:#64748b">(t=+0,95)</span></td><td class="n" style="color:#94a3b8">0,6836</td></tr>
+<tr><td class="mono"><b>AM_POOL</b></td><td class="n">−0,0044<br><span style="font-size:7.6px;color:#64748b">(t=−0,33)</span></td><td class="n" style="color:#94a3b8">0,7852</td><td class="n">+0,1049<br><span style="font-size:7.6px;color:#64748b">(t=+5,78)</span></td><td class="n" style="color:#15803d">0,0100 ✓</td><td class="n">−0,0019<br><span style="font-size:7.6px;color:#64748b">(t=−0,55)</span></td><td class="n" style="color:#94a3b8">0,7852</td><td class="n">−0,0007<br><span style="font-size:7.6px;color:#64748b">(t=−0,21)</span></td><td class="n" style="color:#94a3b8">0,8661</td></tr>
+<tr><td class="mono"><b>FAC_ROOM</b></td><td class="n">−0,1274<br><span style="font-size:7.6px;color:#64748b">(t=−4,71)</span></td><td class="n" style="color:#15803d">0,0075 ✓</td><td class="n">−0,1031<br><span style="font-size:7.6px;color:#64748b">(t=−4,43)</span></td><td class="n" style="color:#15803d">0,0133 ✓</td><td class="n">+0,0205<br><span style="font-size:7.6px;color:#64748b">(t=+4,18)</span></td><td class="n" style="color:#15803d">0,0075 ✓</td><td class="n">+0,0228<br><span style="font-size:7.6px;color:#64748b">(t=+4,90)</span></td><td class="n" style="color:#15803d">0,0133 ✓</td></tr>
+<tr><td class="mono"><b>SER_ATTITUDE</b></td><td class="n">−0,0238<br><span style="font-size:7.6px;color:#64748b">(t=−1,67)</span></td><td class="n" style="color:#94a3b8">0,2947</td><td class="n">−0,0034<br><span style="font-size:7.6px;color:#64748b">(t=−0,27)</span></td><td class="n" style="color:#94a3b8">0,8661</td><td class="n">−0,0014<br><span style="font-size:7.6px;color:#64748b">(t=−0,49)</span></td><td class="n" style="color:#94a3b8">0,7852</td><td class="n">−0,0013<br><span style="font-size:7.6px;color:#64748b">(t=−0,51)</span></td><td class="n" style="color:#94a3b8">0,8379</td></tr>
+</table>
+<table style="font-size:9px"><tr><th style="width:74px">aspect</th><th style="width:168px">verdict (π)</th><th style="width:168px">verdict_val (ν)</th><th>Chuyện gì đã xảy ra</th></tr>
+<tr><td class="mono"><b>AM_FOOD</b></td><td class="vd vd-dao">ĐẢO DẤU sau hiệu chỉnh</td><td class="vd vd-gia">GIẢ (do thành phần)</td><td>WEST chê đồ ăn gấp 3× VN. Khi WEST đi từ 9% lên 80% khối lượng, share thô của AM_FOOD <b>bốc lên</b> (+0,1968/năm) dù <b>trong mỗi stratum nó đang giảm</b>. Hiệu chỉnh cho slope <b>−0,0408</b> — <u>đảo chiều kết luận hoàn toàn</u>. Kênh ν cùng cơ chế nhưng adj không vượt FDR → nhãn GIẢ. Đây là ca sạch nhất của cả bài.</td></tr>
+<tr><td class="mono"><b>AM_WIFI</b></td><td class="vd vd-phang">phẳng</td><td class="vd vd-phang">phẳng</td><td>Wifi <b>thật sự</b> bị chê nhiều hơn trong cả hai stratum (+4,0 điểm %). Nhưng VN chê wifi nhiều hơn WEST, và VN đang teo đi — hai hiệu ứng gần như <b>triệt tiêu nhau</b>. Raw −0,0412 (không sig), adj +0,0424 (cũng chưa vượt FDR với m=10). Kết luận đúng: <b>chưa đủ bằng chứng</b>.</td></tr>
+<tr><td class="mono"><b>AM_POOL</b></td><td class="vd vd-che">BỊ CHE, lộ ra sau hiệu chỉnh</td><td class="vd vd-phang">phẳng</td><td>Cơ chế giống AM_WIFI nhưng biên độ nội tại lớn hơn: raw −0,0044 ≈ 0 (thành phần che gần hết), adj <b>+0,1049</b> vượt FDR. <u>Không hiệu chỉnh thì bỏ sót hoàn toàn xu hướng này.</u></td></tr>
+<tr><td class="mono"><b>FAC_ROOM</b></td><td class="vd vd-that">XU HƯỚNG THẬT</td><td class="vd vd-that">XU HƯỚNG THẬT</td><td>Hai stratum chê phòng ở mức <b>gần như giống nhau</b> (28% vs 27%), nên thành phần đổi cũng không làm lệch được gì: raw −0,1274 và adj −0,1031 gần nhau, cùng dấu, cùng sig. Đây là <b>đối chứng dương</b> — nếu cả FAC_ROOM cũng bị hiệu chỉnh làm đổi dấu thì chính bước hiệu chỉnh đang hỏng.</td></tr>
+<tr><td class="mono"><b>SER_ATTITUDE</b></td><td class="vd vd-phang">phẳng</td><td class="vd vd-phang">phẳng</td><td>Không có xu hướng nội tại, hai stratum gần giống nhau → cả raw (−0,0238) lẫn adj (−0,0034) đều không sig. <b>Đối chứng âm</b>: pipeline im lặng đúng chỗ cần im lặng.</td></tr>
+</table>
+<div class="fig">
+<svg viewBox="0 0 505 118" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,sans-serif"><rect x="46" y="14" width="451" height="82" fill="#fbfcfe" stroke="#e2e8f0"/><line x1="46" y1="96.0" x2="497.0" y2="96.0" stroke="#eef2f7"/><text x="42" y="98.2" font-size="6.6" fill="#64748b" text-anchor="end">-0,876</text><line x1="46" y1="68.7" x2="497.0" y2="68.7" stroke="#eef2f7"/><text x="42" y="70.9" font-size="6.6" fill="#64748b" text-anchor="end">-0,618</text><line x1="46" y1="41.3" x2="497.0" y2="41.3" stroke="#eef2f7"/><text x="42" y="43.5" font-size="6.6" fill="#64748b" text-anchor="end">-0,360</text><line x1="46" y1="14.0" x2="497.0" y2="14.0" stroke="#eef2f7"/><text x="42" y="16.2" font-size="6.6" fill="#64748b" text-anchor="end">-0,102</text><text x="46.0" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-03</text><line x1="46.0" y1="14" x2="46.0" y2="96" stroke="#e2e8f0"/><text x="104.8" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-06</text><line x1="104.8" y1="14" x2="104.8" y2="96" stroke="#e2e8f0"/><text x="163.7" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-09</text><line x1="163.7" y1="14" x2="163.7" y2="96" stroke="#e2e8f0"/><text x="222.5" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-12</text><line x1="222.5" y1="14" x2="222.5" y2="96" stroke="#e2e8f0"/><text x="281.3" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-03</text><line x1="281.3" y1="14" x2="281.3" y2="96" stroke="#e2e8f0"/><text x="340.1" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-06</text><line x1="340.1" y1="14" x2="340.1" y2="96" stroke="#e2e8f0"/><text x="399.0" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-09</text><line x1="399.0" y1="14" x2="399.0" y2="96" stroke="#e2e8f0"/><text x="457.8" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-12</text><line x1="457.8" y1="14" x2="457.8" y2="96" stroke="#e2e8f0"/><polyline points="46.0,88.1 65.6,76.9 85.2,67.2 104.8,50.8 124.4,62.0 144.0,48.4 163.7,58.3 183.3,57.7 202.9,52.5 222.5,63.3 242.1,54.7 261.7,65.8 281.3,55.1 300.9,39.0 320.5,36.1 340.1,21.9 359.7,29.5 379.3,33.5 399.0,28.3 418.6,34.8 438.2,38.0 457.8,29.3 477.4,27.7 497.0,39.1" fill="none" stroke="#b91c1c" stroke-width="1.5"/><circle cx="46.0" cy="88.1" r="1.3" fill="#b91c1c"/><circle cx="65.6" cy="76.9" r="1.3" fill="#b91c1c"/><circle cx="85.2" cy="67.2" r="1.3" fill="#b91c1c"/><circle cx="104.8" cy="50.8" r="1.3" fill="#b91c1c"/><circle cx="124.4" cy="62.0" r="1.3" fill="#b91c1c"/><circle cx="144.0" cy="48.4" r="1.3" fill="#b91c1c"/><circle cx="163.7" cy="58.3" r="1.3" fill="#b91c1c"/><circle cx="183.3" cy="57.7" r="1.3" fill="#b91c1c"/><circle cx="202.9" cy="52.5" r="1.3" fill="#b91c1c"/><circle cx="222.5" cy="63.3" r="1.3" fill="#b91c1c"/><circle cx="242.1" cy="54.7" r="1.3" fill="#b91c1c"/><circle cx="261.7" cy="65.8" r="1.3" fill="#b91c1c"/><circle cx="281.3" cy="55.1" r="1.3" fill="#b91c1c"/><circle cx="300.9" cy="39.0" r="1.3" fill="#b91c1c"/><circle cx="320.5" cy="36.1" r="1.3" fill="#b91c1c"/><circle cx="340.1" cy="21.9" r="1.3" fill="#b91c1c"/><circle cx="359.7" cy="29.5" r="1.3" fill="#b91c1c"/><circle cx="379.3" cy="33.5" r="1.3" fill="#b91c1c"/><circle cx="399.0" cy="28.3" r="1.3" fill="#b91c1c"/><circle cx="418.6" cy="34.8" r="1.3" fill="#b91c1c"/><circle cx="438.2" cy="38.0" r="1.3" fill="#b91c1c"/><circle cx="457.8" cy="29.3" r="1.3" fill="#b91c1c"/><circle cx="477.4" cy="27.7" r="1.3" fill="#b91c1c"/><circle cx="497.0" cy="39.1" r="1.3" fill="#b91c1c"/><polyline points="46.0,46.6 65.6,46.3 85.2,40.3 104.8,26.8 124.4,43.5 144.0,31.4 163.7,42.0 183.3,42.7 202.9,44.3 222.5,52.7 242.1,51.2 261.7,62.5 281.3,59.0 300.9,42.4 320.5,45.9 340.1,32.7 359.7,41.3 379.3,43.6 399.0,44.9 418.6,52.6 438.2,58.4 457.8,55.1 477.4,56.3 497.0,67.2" fill="none" stroke="#15803d" stroke-width="1.5"/><circle cx="46.0" cy="46.6" r="1.3" fill="#15803d"/><circle cx="65.6" cy="46.3" r="1.3" fill="#15803d"/><circle cx="85.2" cy="40.3" r="1.3" fill="#15803d"/><circle cx="104.8" cy="26.8" r="1.3" fill="#15803d"/><circle cx="124.4" cy="43.5" r="1.3" fill="#15803d"/><circle cx="144.0" cy="31.4" r="1.3" fill="#15803d"/><circle cx="163.7" cy="42.0" r="1.3" fill="#15803d"/><circle cx="183.3" cy="42.7" r="1.3" fill="#15803d"/><circle cx="202.9" cy="44.3" r="1.3" fill="#15803d"/><circle cx="222.5" cy="52.7" r="1.3" fill="#15803d"/><circle cx="242.1" cy="51.2" r="1.3" fill="#15803d"/><circle cx="261.7" cy="62.5" r="1.3" fill="#15803d"/><circle cx="281.3" cy="59.0" r="1.3" fill="#15803d"/><circle cx="300.9" cy="42.4" r="1.3" fill="#15803d"/><circle cx="320.5" cy="45.9" r="1.3" fill="#15803d"/><circle cx="340.1" cy="32.7" r="1.3" fill="#15803d"/><circle cx="359.7" cy="41.3" r="1.3" fill="#15803d"/><circle cx="379.3" cy="43.6" r="1.3" fill="#15803d"/><circle cx="399.0" cy="44.9" r="1.3" fill="#15803d"/><circle cx="418.6" cy="52.6" r="1.3" fill="#15803d"/><circle cx="438.2" cy="58.4" r="1.3" fill="#15803d"/><circle cx="457.8" cy="55.1" r="1.3" fill="#15803d"/><circle cx="477.4" cy="56.3" r="1.3" fill="#15803d"/><circle cx="497.0" cy="67.2" r="1.3" fill="#15803d"/><rect x="50.0" y="17" width="7" height="2.6" fill="#b91c1c"/><text x="59.0" y="20" font-size="6.6" fill="#334155">clr(π-raw)</text><rect x="97.0" y="17" width="7" height="2.6" fill="#15803d"/><text x="106.0" y="20" font-size="6.6" fill="#334155">clr(π-adj)</text><text x="2" y="9" font-size="7" fill="#0f172a" font-weight="700">AM_FOOD — kênh π trên thang CLR: thô đi LÊN, hiệu chỉnh đi XUỐNG</text><text x="503" y="9" font-size="6.4" fill="#64748b" text-anchor="end">clr</text></svg>
+<div class="figcap">Hai đường cùng một dữ liệu. Đường đỏ là cái một phân tích thô sẽ báo cáo (slope +0,1968/năm, q = 0,0050 ✓). Đường xanh là ước lượng đứng theo thành phần tham chiếu (slope −0,0408/năm, q = 0,0175 ✓). Cùng sig, <b>trái dấu</b> ⇒ nhãn ĐẢO DẤU.</div>
+</div>
+<div class="fig">
+<svg viewBox="0 0 505 118" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,sans-serif"><rect x="46" y="14" width="451" height="82" fill="#fbfcfe" stroke="#e2e8f0"/><line x1="46" y1="96.0" x2="497.0" y2="96.0" stroke="#eef2f7"/><text x="42" y="98.2" font-size="6.6" fill="#64748b" text-anchor="end">-0,799</text><line x1="46" y1="68.7" x2="497.0" y2="68.7" stroke="#eef2f7"/><text x="42" y="70.9" font-size="6.6" fill="#64748b" text-anchor="end">-0,679</text><line x1="46" y1="41.3" x2="497.0" y2="41.3" stroke="#eef2f7"/><text x="42" y="43.5" font-size="6.6" fill="#64748b" text-anchor="end">-0,559</text><line x1="46" y1="14.0" x2="497.0" y2="14.0" stroke="#eef2f7"/><text x="42" y="16.2" font-size="6.6" fill="#64748b" text-anchor="end">-0,439</text><text x="46.0" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-03</text><line x1="46.0" y1="14" x2="46.0" y2="96" stroke="#e2e8f0"/><text x="104.8" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-06</text><line x1="104.8" y1="14" x2="104.8" y2="96" stroke="#e2e8f0"/><text x="163.7" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-09</text><line x1="163.7" y1="14" x2="163.7" y2="96" stroke="#e2e8f0"/><text x="222.5" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-12</text><line x1="222.5" y1="14" x2="222.5" y2="96" stroke="#e2e8f0"/><text x="281.3" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-03</text><line x1="281.3" y1="14" x2="281.3" y2="96" stroke="#e2e8f0"/><text x="340.1" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-06</text><line x1="340.1" y1="14" x2="340.1" y2="96" stroke="#e2e8f0"/><text x="399.0" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-09</text><line x1="399.0" y1="14" x2="399.0" y2="96" stroke="#e2e8f0"/><text x="457.8" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-12</text><line x1="457.8" y1="14" x2="457.8" y2="96" stroke="#e2e8f0"/><polyline points="46.0,60.6 65.6,43.6 85.2,43.4 104.8,65.7 124.4,49.2 144.0,68.9 163.7,47.6 183.3,72.2 202.9,40.6 222.5,55.5 242.1,60.7 261.7,59.4 281.3,61.5 300.9,60.6 320.5,58.1 340.1,55.8 359.7,76.2 379.3,40.3 399.0,56.1 418.6,51.4 438.2,56.3 457.8,68.9 477.4,47.8 497.0,50.4" fill="none" stroke="#b91c1c" stroke-width="1.5"/><circle cx="46.0" cy="60.6" r="1.3" fill="#b91c1c"/><circle cx="65.6" cy="43.6" r="1.3" fill="#b91c1c"/><circle cx="85.2" cy="43.4" r="1.3" fill="#b91c1c"/><circle cx="104.8" cy="65.7" r="1.3" fill="#b91c1c"/><circle cx="124.4" cy="49.2" r="1.3" fill="#b91c1c"/><circle cx="144.0" cy="68.9" r="1.3" fill="#b91c1c"/><circle cx="163.7" cy="47.6" r="1.3" fill="#b91c1c"/><circle cx="183.3" cy="72.2" r="1.3" fill="#b91c1c"/><circle cx="202.9" cy="40.6" r="1.3" fill="#b91c1c"/><circle cx="222.5" cy="55.5" r="1.3" fill="#b91c1c"/><circle cx="242.1" cy="60.7" r="1.3" fill="#b91c1c"/><circle cx="261.7" cy="59.4" r="1.3" fill="#b91c1c"/><circle cx="281.3" cy="61.5" r="1.3" fill="#b91c1c"/><circle cx="300.9" cy="60.6" r="1.3" fill="#b91c1c"/><circle cx="320.5" cy="58.1" r="1.3" fill="#b91c1c"/><circle cx="340.1" cy="55.8" r="1.3" fill="#b91c1c"/><circle cx="359.7" cy="76.2" r="1.3" fill="#b91c1c"/><circle cx="379.3" cy="40.3" r="1.3" fill="#b91c1c"/><circle cx="399.0" cy="56.1" r="1.3" fill="#b91c1c"/><circle cx="418.6" cy="51.4" r="1.3" fill="#b91c1c"/><circle cx="438.2" cy="56.3" r="1.3" fill="#b91c1c"/><circle cx="457.8" cy="68.9" r="1.3" fill="#b91c1c"/><circle cx="477.4" cy="47.8" r="1.3" fill="#b91c1c"/><circle cx="497.0" cy="50.4" r="1.3" fill="#b91c1c"/><polyline points="46.0,88.1 65.6,72.3 85.2,71.1 104.8,86.6 124.4,71.5 144.0,86.6 163.7,61.2 183.3,85.2 202.9,50.3 222.5,67.2 242.1,64.2 261.7,61.8 281.3,56.3 300.9,58.7 320.5,45.7 340.1,39.5 359.7,67.1 379.3,31.5 399.0,36.5 418.6,27.3 438.2,25.9 457.8,48.6 477.4,21.9 497.0,24.5" fill="none" stroke="#15803d" stroke-width="1.5"/><circle cx="46.0" cy="88.1" r="1.3" fill="#15803d"/><circle cx="65.6" cy="72.3" r="1.3" fill="#15803d"/><circle cx="85.2" cy="71.1" r="1.3" fill="#15803d"/><circle cx="104.8" cy="86.6" r="1.3" fill="#15803d"/><circle cx="124.4" cy="71.5" r="1.3" fill="#15803d"/><circle cx="144.0" cy="86.6" r="1.3" fill="#15803d"/><circle cx="163.7" cy="61.2" r="1.3" fill="#15803d"/><circle cx="183.3" cy="85.2" r="1.3" fill="#15803d"/><circle cx="202.9" cy="50.3" r="1.3" fill="#15803d"/><circle cx="222.5" cy="67.2" r="1.3" fill="#15803d"/><circle cx="242.1" cy="64.2" r="1.3" fill="#15803d"/><circle cx="261.7" cy="61.8" r="1.3" fill="#15803d"/><circle cx="281.3" cy="56.3" r="1.3" fill="#15803d"/><circle cx="300.9" cy="58.7" r="1.3" fill="#15803d"/><circle cx="320.5" cy="45.7" r="1.3" fill="#15803d"/><circle cx="340.1" cy="39.5" r="1.3" fill="#15803d"/><circle cx="359.7" cy="67.1" r="1.3" fill="#15803d"/><circle cx="379.3" cy="31.5" r="1.3" fill="#15803d"/><circle cx="399.0" cy="36.5" r="1.3" fill="#15803d"/><circle cx="418.6" cy="27.3" r="1.3" fill="#15803d"/><circle cx="438.2" cy="25.9" r="1.3" fill="#15803d"/><circle cx="457.8" cy="48.6" r="1.3" fill="#15803d"/><circle cx="477.4" cy="21.9" r="1.3" fill="#15803d"/><circle cx="497.0" cy="24.5" r="1.3" fill="#15803d"/><rect x="50.0" y="17" width="7" height="2.6" fill="#b91c1c"/><text x="59.0" y="20" font-size="6.6" fill="#334155">clr(π-raw)</text><rect x="97.0" y="17" width="7" height="2.6" fill="#15803d"/><text x="106.0" y="20" font-size="6.6" fill="#334155">clr(π-adj)</text><text x="2" y="9" font-size="7" fill="#0f172a" font-weight="700">AM_POOL — tín hiệu BỊ CHE: thô phẳng, hiệu chỉnh mới lộ ra</text><text x="503" y="9" font-size="6.4" fill="#64748b" text-anchor="end">clr</text></svg>
+<div class="figcap">Đường đỏ gần như nằm ngang (slope −0,0044, q = 0,7852 ✗) — một phân tích thô sẽ kết luận “không có gì”. Đường xanh dốc lên rõ (slope +0,1049, q = 0,0100 ✓). Ca mà hiệu chỉnh <b>phát hiện thêm</b>.</div>
+</div>
+<div class="fig">
+<svg viewBox="0 0 505 118" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,sans-serif"><rect x="46" y="14" width="451" height="82" fill="#fbfcfe" stroke="#e2e8f0"/><line x1="46" y1="96.0" x2="497.0" y2="96.0" stroke="#eef2f7"/><text x="42" y="98.2" font-size="6.6" fill="#64748b" text-anchor="end">-0,015</text><line x1="46" y1="68.7" x2="497.0" y2="68.7" stroke="#eef2f7"/><text x="42" y="70.9" font-size="6.6" fill="#64748b" text-anchor="end">0,198</text><line x1="46" y1="41.3" x2="497.0" y2="41.3" stroke="#eef2f7"/><text x="42" y="43.5" font-size="6.6" fill="#64748b" text-anchor="end">0,412</text><line x1="46" y1="14.0" x2="497.0" y2="14.0" stroke="#eef2f7"/><text x="42" y="16.2" font-size="6.6" fill="#64748b" text-anchor="end">0,625</text><text x="46.0" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-03</text><line x1="46.0" y1="14" x2="46.0" y2="96" stroke="#e2e8f0"/><text x="104.8" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-06</text><line x1="104.8" y1="14" x2="104.8" y2="96" stroke="#e2e8f0"/><text x="163.7" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-09</text><line x1="163.7" y1="14" x2="163.7" y2="96" stroke="#e2e8f0"/><text x="222.5" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-12</text><line x1="222.5" y1="14" x2="222.5" y2="96" stroke="#e2e8f0"/><text x="281.3" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-03</text><line x1="281.3" y1="14" x2="281.3" y2="96" stroke="#e2e8f0"/><text x="340.1" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-06</text><line x1="340.1" y1="14" x2="340.1" y2="96" stroke="#e2e8f0"/><text x="399.0" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-09</text><line x1="399.0" y1="14" x2="399.0" y2="96" stroke="#e2e8f0"/><text x="457.8" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-12</text><line x1="457.8" y1="14" x2="457.8" y2="96" stroke="#e2e8f0"/><polyline points="46.0,21.9 65.6,41.1 85.2,48.0 104.8,29.2 124.4,58.3 144.0,33.5 163.7,47.4 183.3,43.2 202.9,58.3 222.5,32.7 242.1,46.9 261.7,49.7 281.3,51.2 300.9,50.7 320.5,46.6 340.1,62.4 359.7,64.5 379.3,71.3 399.0,62.7 418.6,73.8 438.2,60.4 457.8,76.7 477.4,88.1 497.0,62.9" fill="none" stroke="#b91c1c" stroke-width="1.5"/><circle cx="46.0" cy="21.9" r="1.3" fill="#b91c1c"/><circle cx="65.6" cy="41.1" r="1.3" fill="#b91c1c"/><circle cx="85.2" cy="48.0" r="1.3" fill="#b91c1c"/><circle cx="104.8" cy="29.2" r="1.3" fill="#b91c1c"/><circle cx="124.4" cy="58.3" r="1.3" fill="#b91c1c"/><circle cx="144.0" cy="33.5" r="1.3" fill="#b91c1c"/><circle cx="163.7" cy="47.4" r="1.3" fill="#b91c1c"/><circle cx="183.3" cy="43.2" r="1.3" fill="#b91c1c"/><circle cx="202.9" cy="58.3" r="1.3" fill="#b91c1c"/><circle cx="222.5" cy="32.7" r="1.3" fill="#b91c1c"/><circle cx="242.1" cy="46.9" r="1.3" fill="#b91c1c"/><circle cx="261.7" cy="49.7" r="1.3" fill="#b91c1c"/><circle cx="281.3" cy="51.2" r="1.3" fill="#b91c1c"/><circle cx="300.9" cy="50.7" r="1.3" fill="#b91c1c"/><circle cx="320.5" cy="46.6" r="1.3" fill="#b91c1c"/><circle cx="340.1" cy="62.4" r="1.3" fill="#b91c1c"/><circle cx="359.7" cy="64.5" r="1.3" fill="#b91c1c"/><circle cx="379.3" cy="71.3" r="1.3" fill="#b91c1c"/><circle cx="399.0" cy="62.7" r="1.3" fill="#b91c1c"/><circle cx="418.6" cy="73.8" r="1.3" fill="#b91c1c"/><circle cx="438.2" cy="60.4" r="1.3" fill="#b91c1c"/><circle cx="457.8" cy="76.7" r="1.3" fill="#b91c1c"/><circle cx="477.4" cy="88.1" r="1.3" fill="#b91c1c"/><circle cx="497.0" cy="62.9" r="1.3" fill="#b91c1c"/><polyline points="46.0,32.0 65.6,42.9 85.2,44.7 104.8,36.6 124.4,58.0 144.0,35.3 163.7,50.3 183.3,45.1 202.9,58.3 222.5,34.5 242.1,47.3 261.7,49.7 281.3,51.9 300.9,49.9 320.5,44.4 340.1,61.4 359.7,58.9 379.3,70.3 399.0,60.4 418.6,74.7 438.2,59.6 457.8,71.3 477.4,81.3 497.0,61.7" fill="none" stroke="#15803d" stroke-width="1.5"/><circle cx="46.0" cy="32.0" r="1.3" fill="#15803d"/><circle cx="65.6" cy="42.9" r="1.3" fill="#15803d"/><circle cx="85.2" cy="44.7" r="1.3" fill="#15803d"/><circle cx="104.8" cy="36.6" r="1.3" fill="#15803d"/><circle cx="124.4" cy="58.0" r="1.3" fill="#15803d"/><circle cx="144.0" cy="35.3" r="1.3" fill="#15803d"/><circle cx="163.7" cy="50.3" r="1.3" fill="#15803d"/><circle cx="183.3" cy="45.1" r="1.3" fill="#15803d"/><circle cx="202.9" cy="58.3" r="1.3" fill="#15803d"/><circle cx="222.5" cy="34.5" r="1.3" fill="#15803d"/><circle cx="242.1" cy="47.3" r="1.3" fill="#15803d"/><circle cx="261.7" cy="49.7" r="1.3" fill="#15803d"/><circle cx="281.3" cy="51.9" r="1.3" fill="#15803d"/><circle cx="300.9" cy="49.9" r="1.3" fill="#15803d"/><circle cx="320.5" cy="44.4" r="1.3" fill="#15803d"/><circle cx="340.1" cy="61.4" r="1.3" fill="#15803d"/><circle cx="359.7" cy="58.9" r="1.3" fill="#15803d"/><circle cx="379.3" cy="70.3" r="1.3" fill="#15803d"/><circle cx="399.0" cy="60.4" r="1.3" fill="#15803d"/><circle cx="418.6" cy="74.7" r="1.3" fill="#15803d"/><circle cx="438.2" cy="59.6" r="1.3" fill="#15803d"/><circle cx="457.8" cy="71.3" r="1.3" fill="#15803d"/><circle cx="477.4" cy="81.3" r="1.3" fill="#15803d"/><circle cx="497.0" cy="61.7" r="1.3" fill="#15803d"/><rect x="50.0" y="17" width="7" height="2.6" fill="#b91c1c"/><text x="59.0" y="20" font-size="6.6" fill="#334155">clr(π-raw)</text><rect x="97.0" y="17" width="7" height="2.6" fill="#15803d"/><text x="106.0" y="20" font-size="6.6" fill="#334155">clr(π-adj)</text><text x="2" y="9" font-size="7" fill="#0f172a" font-weight="700">FAC_ROOM — đối chứng dương: hai đường gần trùng nhau</text><text x="503" y="9" font-size="6.4" fill="#64748b" text-anchor="end">clr</text></svg>
+<div class="figcap">Hai stratum chê phòng ở mức gần giống nhau nên hiệu chỉnh gần như không đổi gì: −0,1274 vs −0,1031. Nếu ca này cũng bị đổi dấu thì bước hiệu chỉnh đang hỏng — đây là phép thử tự kiểm của Module D.</div>
+</div>
+<h3>8.11 Kênh ν — negativity rate, thế số cho AM_FOOD kỳ 2022-03</h3>
+<div class="fx">ν<sub>a,t</sub> = P(negative | có nhắc a, kỳ t) — trên <b>MỌI</b> quad, không chỉ complaint
+<span class="why">Trả lời câu hỏi thứ hai của bài: “<i>nhắc tới a thì có chê nặng hơn không?</i>”.
+Khác kênh π ở chỗ mẫu số là <b>mọi</b> quad của aspect đó, nên nó không chịu ràng buộc simplex và
+<b>không</b> cần CLR.</span></div>
+<table style="width:80%"><tr><th>(2022-03, stratum) × AM_FOOD</th><th class="n">Σw negative</th><th class="n">Σw neutral</th><th class="n">Σw positive</th><th class="n">Σw tất cả</th><th class="n">ν trong ô</th></tr>
+<tr><td><span class="mono">(VN, Cặp đôi)</span></td><td class="n">41,311</td><td class="n">16,750</td><td class="n">76,303</td><td class="n">134,364</td><td class="n"><b>0,3075</b></td></tr>
+<tr><td><span class="mono">(WEST, Cặp đôi)</span></td><td class="n">25,011</td><td class="n">4,079</td><td class="n">18,583</td><td class="n">47,673</td><td class="n"><b>0,5246</b></td></tr>
+<tr style="background:#eef2f7"><td><b>gộp cả kỳ</b></td><td class="n"><b>66,322</b></td><td class="n">20,829</td><td class="n">94,886</td><td class="n"><b>182,037</b></td><td class="n"><b>0,3643</b></td></tr></table>
+<div class="fx">ν̃<sub>a,t</sub> = [ Σ<sub>g</sub> π<sup>ref</sup><sub>g</sub> · ( w<sub>neg,g</sub> + m<sub>ν</sub>·ν0 ) / ( w<sub>all,g</sub> + m<sub>ν</sub> ) ] / Σ<sub>g</sub> π<sup>ref</sup><sub>g</sub>,&nbsp;&nbsp; m<sub>ν</sub> = --min-valence-w = 10
+<span class="why">ν0 = tỷ lệ gộp của <b>chính kỳ đó</b> (prior Beta). Tham chiếu của kênh ν được tính
+<b>riêng</b> (<span class="mono">reference_composition_valence</span>, dựa trên MỌI quad) chứ không dùng lại
+tham chiếu của kênh π (chỉ complaint). Kỳ không có quad nào của aspect → <span class="mono">None</span>,
+bị loại khỏi chuỗi, <b>không nội suy</b>.</span></div>
+<div class="calc">ν0 = 66,322 / 182,037 = <b>0,36433</b>   ;   m_ν = 10   ;   π^ref_v = (VN 0,5535 ; WEST 0,4465)
+
+
+  VN   : (41,311 + 10·0,36433) / (134,364 + 10) = 44,9543 / 144,364 = 0,31140
+
+  WEST : (25,011 + 10·0,36433) / (47,673 + 10) = 28,6543 / 57,673 = 0,49684
+
+
+  ν̃ = (0,5535·0,31140 + 0,4465·0,49684) / 1,0000 = 0,39420 / 1,0000 = <b>0,39420</b>
+
+
+  so sánh:  ν^raw = 36,43%   vs   ν^adj = <b>39,42%</b>   (chênh 2,99 điểm %)
+</div>
+<div class="fig">
+<svg viewBox="0 0 505 118" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,sans-serif"><rect x="46" y="14" width="451" height="82" fill="#fbfcfe" stroke="#e2e8f0"/><line x1="46" y1="96.0" x2="497.0" y2="96.0" stroke="#eef2f7"/><text x="42" y="98.2" font-size="6.6" fill="#64748b" text-anchor="end">0,338</text><line x1="46" y1="68.7" x2="497.0" y2="68.7" stroke="#eef2f7"/><text x="42" y="70.9" font-size="6.6" fill="#64748b" text-anchor="end">0,404</text><line x1="46" y1="41.3" x2="497.0" y2="41.3" stroke="#eef2f7"/><text x="42" y="43.5" font-size="6.6" fill="#64748b" text-anchor="end">0,469</text><line x1="46" y1="14.0" x2="497.0" y2="14.0" stroke="#eef2f7"/><text x="42" y="16.2" font-size="6.6" fill="#64748b" text-anchor="end">0,535</text><text x="46.0" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-03</text><line x1="46.0" y1="14" x2="46.0" y2="96" stroke="#e2e8f0"/><text x="104.8" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-06</text><line x1="104.8" y1="14" x2="104.8" y2="96" stroke="#e2e8f0"/><text x="163.7" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-09</text><line x1="163.7" y1="14" x2="163.7" y2="96" stroke="#e2e8f0"/><text x="222.5" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2022-12</text><line x1="222.5" y1="14" x2="222.5" y2="96" stroke="#e2e8f0"/><text x="281.3" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-03</text><line x1="281.3" y1="14" x2="281.3" y2="96" stroke="#e2e8f0"/><text x="340.1" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-06</text><line x1="340.1" y1="14" x2="340.1" y2="96" stroke="#e2e8f0"/><text x="399.0" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-09</text><line x1="399.0" y1="14" x2="399.0" y2="96" stroke="#e2e8f0"/><text x="457.8" y="110" font-size="6.2" fill="#64748b" text-anchor="middle">2023-12</text><line x1="457.8" y1="14" x2="457.8" y2="96" stroke="#e2e8f0"/><polyline points="46.0,85.0 65.6,88.1 85.2,77.6 104.8,75.1 124.4,77.7 144.0,67.0 163.7,60.3 183.3,60.9 202.9,74.1 222.5,47.6 242.1,48.8 261.7,51.4 281.3,45.2 300.9,54.4 320.5,44.2 340.1,39.5 359.7,34.3 379.3,48.8 399.0,41.9 418.6,55.2 438.2,21.9 457.8,22.7 477.4,36.0 497.0,31.7" fill="none" stroke="#b91c1c" stroke-width="1.5"/><circle cx="46.0" cy="85.0" r="1.3" fill="#b91c1c"/><circle cx="65.6" cy="88.1" r="1.3" fill="#b91c1c"/><circle cx="85.2" cy="77.6" r="1.3" fill="#b91c1c"/><circle cx="104.8" cy="75.1" r="1.3" fill="#b91c1c"/><circle cx="124.4" cy="77.7" r="1.3" fill="#b91c1c"/><circle cx="144.0" cy="67.0" r="1.3" fill="#b91c1c"/><circle cx="163.7" cy="60.3" r="1.3" fill="#b91c1c"/><circle cx="183.3" cy="60.9" r="1.3" fill="#b91c1c"/><circle cx="202.9" cy="74.1" r="1.3" fill="#b91c1c"/><circle cx="222.5" cy="47.6" r="1.3" fill="#b91c1c"/><circle cx="242.1" cy="48.8" r="1.3" fill="#b91c1c"/><circle cx="261.7" cy="51.4" r="1.3" fill="#b91c1c"/><circle cx="281.3" cy="45.2" r="1.3" fill="#b91c1c"/><circle cx="300.9" cy="54.4" r="1.3" fill="#b91c1c"/><circle cx="320.5" cy="44.2" r="1.3" fill="#b91c1c"/><circle cx="340.1" cy="39.5" r="1.3" fill="#b91c1c"/><circle cx="359.7" cy="34.3" r="1.3" fill="#b91c1c"/><circle cx="379.3" cy="48.8" r="1.3" fill="#b91c1c"/><circle cx="399.0" cy="41.9" r="1.3" fill="#b91c1c"/><circle cx="418.6" cy="55.2" r="1.3" fill="#b91c1c"/><circle cx="438.2" cy="21.9" r="1.3" fill="#b91c1c"/><circle cx="457.8" cy="22.7" r="1.3" fill="#b91c1c"/><circle cx="477.4" cy="36.0" r="1.3" fill="#b91c1c"/><circle cx="497.0" cy="31.7" r="1.3" fill="#b91c1c"/><polyline points="46.0,72.6 65.6,77.5 85.2,71.9 104.8,71.2 124.4,73.4 144.0,70.5 163.7,67.9 183.3,70.7 202.9,84.9 222.5,64.4 242.1,66.3 261.7,65.2 281.3,64.0 300.9,76.5 320.5,67.7 340.1,63.4 359.7,64.4 379.3,67.5 399.0,67.5 418.6,74.2 438.2,54.6 457.8,53.9 477.4,67.7 497.0,60.9" fill="none" stroke="#15803d" stroke-width="1.5"/><circle cx="46.0" cy="72.6" r="1.3" fill="#15803d"/><circle cx="65.6" cy="77.5" r="1.3" fill="#15803d"/><circle cx="85.2" cy="71.9" r="1.3" fill="#15803d"/><circle cx="104.8" cy="71.2" r="1.3" fill="#15803d"/><circle cx="124.4" cy="73.4" r="1.3" fill="#15803d"/><circle cx="144.0" cy="70.5" r="1.3" fill="#15803d"/><circle cx="163.7" cy="67.9" r="1.3" fill="#15803d"/><circle cx="183.3" cy="70.7" r="1.3" fill="#15803d"/><circle cx="202.9" cy="84.9" r="1.3" fill="#15803d"/><circle cx="222.5" cy="64.4" r="1.3" fill="#15803d"/><circle cx="242.1" cy="66.3" r="1.3" fill="#15803d"/><circle cx="261.7" cy="65.2" r="1.3" fill="#15803d"/><circle cx="281.3" cy="64.0" r="1.3" fill="#15803d"/><circle cx="300.9" cy="76.5" r="1.3" fill="#15803d"/><circle cx="320.5" cy="67.7" r="1.3" fill="#15803d"/><circle cx="340.1" cy="63.4" r="1.3" fill="#15803d"/><circle cx="359.7" cy="64.4" r="1.3" fill="#15803d"/><circle cx="379.3" cy="67.5" r="1.3" fill="#15803d"/><circle cx="399.0" cy="67.5" r="1.3" fill="#15803d"/><circle cx="418.6" cy="74.2" r="1.3" fill="#15803d"/><circle cx="438.2" cy="54.6" r="1.3" fill="#15803d"/><circle cx="457.8" cy="53.9" r="1.3" fill="#15803d"/><circle cx="477.4" cy="67.7" r="1.3" fill="#15803d"/><circle cx="497.0" cy="60.9" r="1.3" fill="#15803d"/><rect x="50.0" y="17" width="7" height="2.6" fill="#b91c1c"/><text x="59.0" y="20" font-size="6.6" fill="#334155">ν-raw</text><rect x="79.0" y="17" width="7" height="2.6" fill="#15803d"/><text x="88.0" y="20" font-size="6.6" fill="#334155">ν-adj</text><text x="2" y="9" font-size="7" fill="#0f172a" font-weight="700">AM_FOOD — kênh ν: tỷ lệ chê thô tăng +0,0507/năm, hiệu chỉnh chỉ +0,0111</text><text x="503" y="9" font-size="6.4" fill="#64748b" text-anchor="end">ν</text></svg>
+<div class="figcap">Trong mini-corpus, ν <b>nội tại</b> của AM_FOOD được đặt <b>cố định</b>: VN 0,300 và WEST 0,520, không đổi theo thời gian. Toàn bộ độ dốc của đường đỏ (+0,0507/năm, q = 0,0050 ✓) do <b>duy nhất</b> việc WEST thế chỗ VN. Đường xanh (+0,0111/năm, q = 0,0549 ✗) đúng là thứ ta muốn: <b>gần phẳng</b>. Nhãn: GIẢ (do thành phần).</div>
+</div>
+<h3>8.12 Bootstrap CI — một bản resample dùng chung cho MỌI aspect</h3>
+<div class="calc">for b in range(--n-boot):                      <span style="color:#64748b"># 1000 cho kết quả cuối; MẶC ĐỊNH CLI = 0 (TẮT)</span>
+    # resample review TRONG từng ô (kỳ × stratum), có hoàn lại, giữ đúng số review của ô
+    cell_b ← dựng lại
+    Sb = shares_by_period(cell_b, ref, …, adjust=True)
+    for a in aspects:                          <span style="color:#64748b"># ← vòng aspect nằm BÊN TRONG vòng bootstrap</span>
+        slopes[a].append( ols_trend(deseason(clr(Sb)[a]))[0] )
+slope_ci95[a] = ( percentile 2,5%% , percentile 97,5%% )</div>
+<p><b>Thứ tự hai vòng lặp không phải chi tiết cài đặt — nó là quyết định thống kê.</b> Vòng bootstrap nằm
+<i>ngoài</i> vòng aspect: mỗi lượt tạo <b>một</b> bản resample rồi lấy slope cho <b>tất cả</b> aspect từ chính
+bản đó. Vừa nhanh gấp |aspects| lần, vừa <b>đúng hơn</b> — các aspect chia sẻ cùng phương án resample nên
+<b>tương quan giữa các share của một composition được bảo toàn</b>. Đây là dữ liệu compositional, không phải
+mấy chuỗi độc lập; resample riêng từng aspect sẽ cho CI hẹp giả tạo.</p>
+<p class="sub">⚠ Bẫy vận hành: <span class="mono">--n-boot</span> mặc định là <b>0</b>. Kết quả cuối
+<b>phải</b> truyền tay <span class="mono">--n-boot 1000</span>, nếu không JSON ra sẽ không có
+<span class="mono">slope_ci95</span> và không ai nhận ra cho tới lúc viết bài.</p>
+<h3>8.13 D-a — bước còn thiếu, và vì sao nó chưa được bật</h3>
+<div class="item bad"><div class="hd">D-a hiện là STUB — chỉ log, chưa áp vào ước lượng
+<span class="badge todo">CHƯA HOÀN THIỆN</span></div>
+<div class="fx">Ñ<sub>a,t,s</sub> = Σ<sub>ℓ</sub> N<sub>a,t,s,ℓ</sub> / ρ̂<sub>rec</sub>(s, ℓ)
+<span class="why">ρ̂ = recall của extractor theo (sentiment × length_bin), ước lượng từ tập D0 (~300 review
+được annotate <b>đầy đủ</b>). Ý tưởng: nếu extractor chỉ bắt được 60% quad negative trong review dài, thì
+mỗi quad bắt được phải được tính thành 1/0,6 = 1,67 quad.</span></div>
+<p><b>Vì sao cần:</b> gold chỉ phủ <b>26%</b> văn bản gốc; phủ ô positive <b>42%</b> nhưng ô negative chỉ
+<b>25%</b>. Và độ dài review trung bình trôi <b>27,5 → 40,8 từ</b> trong cửa sổ. Ghép hai điều đó lại:
+recall của công cụ <i>tự thay đổi theo thời gian</i> → sinh drift giả mà <b>D-b không bắt được</b>, vì đây
+là lỗi <u>đo</u>, không phải đổi <u>thành phần</u>.</p>
+<p><b>Trạng thái code:</b> đọc <span class="mono">recall_table.json</span> nếu có, <b>log WARNING</b>, ghi
+<span class="mono">recall_adjusted: false</span>, và <span class="mono">--final</span> thì
+<span class="mono">SystemExit</span>. Bản cũ log “áp dụng recall_table” trong khi <b>không áp gì</b> —
+người đọc log tin rằng số đã hiệu chỉnh recall. Chặn bởi: tập audit D0 chưa được annotate.</p></div>
+<div class="pb"></div>
+<h2>§9 · Injection — thay cho ground truth mà bài toán không có</h2>
+<p>Không có drift ground truth. Nên ta <b>tạo</b> drift / không-drift có kiểm soát <b>trên chính dữ liệu
+thật</b> rồi kiểm tra pipeline trả lời đúng. Mỗi injection đổi <b>đúng một thứ</b>.</p>
+<h3>9.1 E3a · composition — hiệu chỉnh phải IM LẶNG</h3>
+<div class="calc">Bước 1. Dựng nền null: inject_shuffle — xáo nhãn period GIỮA CÁC review_uid
+         rồi phát xuống MỌI quad của cùng review.
+Bước 2. Tiêm đổi thành phần: theo kỳ, giữ quad với xác suất keep_p
+         VN     1,0 → 0,2      (mô phỏng đúng chiều 89,7%% → 16,1%%)
+         non-VN 0,2 → 1,0
+         Resample-with-drop — KHÔNG sửa nội dung quad nào.
+Bước 3. Chạy drift --level taxonomy_code --cohort corpus --n-perm 300
+Bước 4. Chấm: đếm aspect significant sau FDR ở lưới raw và lưới adj</div>
+<table style="width:76%"><tr><th style="width:110px">Verdict</th><th>Điều kiện</th><th>Đọc thế nào</th></tr>
+<tr><td class="vd vd-that">PASS</td><td><span class="mono">n_adj == 0 ∧ n_raw ≥ 1</span></td>
+    <td>Đúng như thiết kế: thô báo drift giả, adj im lặng</td></tr>
+<tr><td class="vd vd-gia">FAIL</td><td><span class="mono">n_adj &gt; 0</span></td>
+    <td><b>Hiệu chỉnh hỏng</b> — adj báo drift trên nền null</td></tr>
+<tr><td class="vd vd-phang">INCONCLUSIVE</td><td>cả hai = 0</td>
+    <td>Injection quá yếu để raw bắt được (mix aspect giữa các strata quá giống nhau) —
+        <b>không nói được gì về adj</b></td></tr></table>
+<div class="item bad"><div class="hd">Hai chi tiết thiết kế mà bỏ qua là hỏng cả thí nghiệm</div>
+<p><b>(1) Phải xáo timestamp TRƯỚC.</b> Dữ liệu thật <i>có thể</i> chứa drift thật; tiêm thẳng lên đó rồi
+đòi adj im lặng là một yêu cầu vô lý — adj sẽ “fail” vì nó phát hiện đúng.<br>
+<b>(2) Cùng một máy suy diễn cho cả raw và adj</b> (permutation + FDR). So “t-threshold cho raw” với
+“FDR cho adj” là so táo với cam, và luôn cho kết quả có lợi cho bên nào dùng ngưỡng lỏng hơn.</p>
+<p class="mono" style="color:#b91c1c">🔴 Bản cũ shuffle list period rồi zip theo TỪNG QUAD → hai quad của
+cùng một review lạc sang hai tháng khác nhau. Null chứa những review không tồn tại, và với E4 thì phá tương
+quan trong review ⇒ phương sai chuỗi bị hạ ⇒ FPR thực nghiệm bị ước lượng THẤP ⇒ negative control PASS quá dễ.</p></div>
+<h3>9.2 E3c · valence — kênh ν phải BẮT ĐƯỢC, và bắt được từ δ bao nhiêu</h3>
+<div class="calc">inject_valence(quads, aspect=AM_FOOD, δ, t0=2023-09, rng):
+    sau t0, lật δ%% quad positive → negative của MỘT aspect. GIỮ NGUYÊN φ — injection đổi đúng một biến.
+Chấm: với từng δ, val_adj phải significant sau FDR VÀ changepoint nằm trong ±3 kỳ của t0.</div>
+<table style="width:82%"><tr><th class="n" style="width:34px">δ</th><th class="c">ν-adj sig sau FDR</th>
+<th class="c">changepoint</th><th class="c">within ±3 kỳ</th><th class="c">phát hiện?</th></tr>
+<tr><td class="n">2%</td><td class="c">✗ (q = 0,214)</td><td class="c">2022-11</td><td class="c">✗</td>
+    <td class="c" style="color:#b91c1c">không</td></tr>
+<tr><td class="n">5%</td><td class="c">✓ (q = 0,031)</td><td class="c">2023-11</td><td class="c">✓ (+2)</td>
+    <td class="c" style="color:#15803d"><b>CÓ</b></td></tr>
+<tr><td class="n">10%</td><td class="c">✓ (q = 0,004)</td><td class="c">2023-10</td><td class="c">✓ (+1)</td>
+    <td class="c" style="color:#15803d"><b>CÓ</b></td></tr>
+<tr><td class="n">20%</td><td class="c">✓ (q = 0,001)</td><td class="c">2023-09</td><td class="c">✓ (0)</td>
+    <td class="c" style="color:#15803d"><b>CÓ</b></td></tr></table>
+<p class="sub"><span class="badge syn">SỐ MINH HOẠ</span> — minh hoạ dạng bảng mà E3c sinh ra.
+δ nhỏ nhất còn bắt được chính là <b>minimum detectable effect</b> của phương pháp, và nó là một con số
+<b>phải có</b> trong bài: nó nói cho reviewer biết “nếu thực tế có drift nhỏ hơn mức này thì chúng tôi
+sẽ không thấy”. Không có nó, mọi kết quả âm tính đều vô nghĩa.</p>
+<h3>9.3 E4 · negative control — FPR thực nghiệm</h3>
+<div class="calc">Xáo timestamp toàn bộ (ở MỨC REVIEW), lặp --repeats = 5 lần, seed = RANDOM_SEED + i
+FPR mỗi lượt = (số test significant) / (số test có p_fdr)   trên lưới π-adj ∪ ν-adj
+Verdict: PASS nếu mean FPR ≤ 2α = 0,10</div>
+<p><b>Vì sao phải lặp 5 lần:</b> một lần chạy với ~14 aspect cho lưới 28 test, nên bước nhảy nhỏ nhất của
+FPR là 1/28 ≈ 0,036 — độ phân giải quá thô để ước lượng một đại lượng cần so với 0,10.
+<span class="badge real">SỐ THẬT</span> Run thật cho <b>FPR = 0,0</b> trên 5 lượt lặp.</p>
+<div class="pb"></div>
+<h2>§10 · Tổng kết — mỗi step học gì, và bỏ nó thì hỏng gì</h2>
+<table style="font-size:8.9px"><tr><th style="width:76px">Step</th><th style="width:132px">Học / tính ra con số nào</th>
+<th style="width:150px">Con số đó dùng ở đâu tiếp theo</th><th>Bỏ bước này thì hỏng gì</th></tr>
+<tr><td><b>A · store</b></td><td><span class="mono">period · stratum · in_gold · n_words · has_photo</span></td>
+<td>period → trục thời gian D; stratum → chuẩn hoá D-b; in_gold → chặn leakage ở infer/selftrain/photos</td>
+<td><b>Toàn bộ bài</b>. Thiếu <span class="mono">in_gold</span> thì self-training nuốt test set và
+<b>mọi F1 báo cáo vô hiệu mà không phát hiện được bằng cách đọc kết quả</b>.</td></tr>
+
+<tr><td><b>B-data</b></td><td>chuỗi target tuyến tính hoá; <span class="mono">roundtrip_mismatch</span></td>
+<td>input của B-train; ngữ pháp mà parse ở B-infer phải đọc lại được</td>
+<td>Escape sai → mọi quad có <span class="mono">|</span> trong term <b>mất trắng</b> → recall lệch theo
+<i>loại term</i>, không lệch theo aspect nên <b>không xuất hiện ở bảng by_category nào</b>.</td></tr>
+
+<tr><td><b>B-train</b></td><td>trọng số mT5 (cross-entropy token)</td>
+<td>sinh quad cho 1,9M review</td><td>Không có extractor. Đây là chỗ duy nhất model học <i>cách đọc</i>.</td></tr>
+
+<tr><td><b>B-eval</b></td><td>F1 theo ngôn ngữ / độ dài / cực tính</td>
+<td><span class="mono">by_length.L2</span> và <span class="mono">by_polarity_quad</span> → bằng chứng số cho D-a</td>
+<td>Không biết extractor lệch ở đâu → không biện minh được D-a → reviewer hỏi “sao biết recall lệch?” và
+không có câu trả lời.</td></tr>
+
+<tr><td><b>B-selftrain</b></td><td>trọng số student; <span class="mono">neg_rate</span> mỗi vòng</td>
+<td><span class="mono">final_ckpt</span> — infer chính thức PHẢI dùng cái này</td>
+<td>Extractor chỉ biết phân phối của gold (80,5% en), còn pool ~30% tiếng Việt. Không có guardrail thì model
+học chính bias của mình và <b>kênh ν trôi vì công cụ, không vì dữ liệu</b>.</td></tr>
+
+<tr><td><b>B-infer</b></td><td><span class="mono">conf_seq · P_model · p_posterior · provenance_flip</span></td>
+<td>conf_seq + p_posterior → feature của bridge; sentiment (posterior) → cả hai kênh của D</td>
+<td>Không rescore (<span class="mono">--no-rescore</span>) → posterior thành <b>hàm tất định của
+(s dự đoán, φ)</b> và λ mất hết ý nghĩa. Chỉ dùng để debug, không bao giờ cho kết quả bài.</td></tr>
+
+<tr><td><b>C1 verifier</b></td><td>head logistic 7 chiều; AUC · ΔAUC</td>
+<td><span class="mono">v_image</span> → nhãn để fit bridge</td>
+<td>Không có sensor độc lập. <b>ΔAUC</b> mới là kiểm tra thật — AUC tuyệt đối cao có thể chỉ là
+category-prior tự dự đoán được.</td></tr>
+
+<tr><td><b>C3 bridge</b></td><td>head logistic 5 chiều chỉ-text; propensity IPW; Spearman vs audit người</td>
+<td><span class="mono">r̂</span> cho <b>mọi</b> quad, kể cả ~1,03M review không ảnh</td>
+<td>Mất mũi nhọn Information Fusion. Bỏ IPW thì bridge được fit trên mẫu dài hơn/hài lòng hơn mẫu nó sẽ
+được áp lên (56,7 vs 36,5 từ; 8,90 vs 8,68 điểm).</td></tr>
+
+<tr><td><b>C4 apply</b></td><td><span class="mono">w = 1[tax] · r̂</span></td>
+<td>trọng số cộng vào <span class="mono">cell</span>/<span class="mono">vcell</span> của D</td>
+<td>D phải đếm <span class="mono">1</span> thay vì <span class="mono">Σw</span> — mọi quad rác có cùng
+tiếng nói với quad sạch.</td></tr>
+
+<tr><td><b>D · π/ν raw</b></td><td>share &amp; tỷ lệ thô</td><td>lưới FDR raw, dùng cho E3a</td>
+<td>Không có bản đối chứng → không chứng minh được hiệu chỉnh <i>làm gì</i>. Luôn phải báo cáo kèm.</td></tr>
+
+<tr><td><b>D · π/ν adj</b></td><td>direct standardization + shrinkage</td><td><b>kết quả chính thức của bài</b></td>
+<td>Đây là <b>lý do tồn tại của bài</b>. Probe CACT: <b>8/13 aspect đổi kết luận</b> — 5 xu hướng giả bị loại,
+3 xu hướng bị che được phát hiện.</td></tr>
+
+<tr><td><b>D · CLR</b></td><td>đưa từ simplex về không gian thực</td><td>chuỗi vào OLS</td>
+<td>Hồi quy thẳng trên share sinh <b>tương quan âm giả</b> giữa các aspect và vi phạm ràng buộc simplex.</td></tr>
+
+<tr><td><b>D · deseason</b></td><td>trừ hiệu ứng tháng-trong-năm</td><td>chuỗi vào OLS và permutation</td>
+<td>Biên độ mùa của CLIMATE/POOL gấp <b>~4×</b> aspect khác — cửa sổ lệch mùa <b>tự sinh ra “drift”</b>.</td></tr>
+
+<tr><td><b>D · permutation</b></td><td>null riêng từng chuỗi</td><td>p_perm → BH-FDR</td>
+<td>Dùng bảng t chuẩn là sai: chuỗi có tự tương quan, đã qua CLR và deseason, và phương sai khác nhau
+rõ rệt giữa các aspect.</td></tr>
+
+<tr><td><b>D · BH-FDR</b></td><td>q-value trên lưới 2·|aspects|</td><td>gate của verdict</td>
+<td>Với 14 aspect × 2 kênh = 28 test ở α = 0,05, kỳ vọng <b>~1,4 phát hiện giả</b> mỗi lần chạy nếu không
+hiệu chỉnh.</td></tr>
+
+<tr><td><b>E · injection</b></td><td>PASS/FAIL · minimum detectable effect · FPR</td>
+<td>bảng evaluation trung tâm của bài</td>
+<td>Không có ground truth thì đây là <b>bằng chứng duy nhất</b> rằng máy suy diễn hoạt động. Thiếu nó,
+mọi kết quả chỉ là khẳng định.</td></tr>
+</table>
+<div class="item keep"><div class="hd">Ba câu cuối</div>
+<ol>
+<li><b>Chỉ ba chỗ học.</b> mT5 học <i>đọc</i> (cross-entropy token); hai head logistic học <i>chấm độ tin cậy</i>
+(một từ ảnh, một suy rộng ra text). Module D <b>không học gì</b> — nó cộng có trọng số rồi kiểm định.</li>
+<li><b>Mọi score đều mềm, chỉ taxonomy là cứng.</b> Provenance posterior thấp, reliability thấp → trọng số
+nhỏ, <b>không phải bị loại</b>. Lọc cứng sẽ vứt đúng nhóm mỉa mai / phủ định / lỗi extractor — nhóm giàu
+thông tin nhất, và vứt nó một cách <i>có hệ thống</i> nên bias sinh ra không ngẫu nhiên.</li>
+<li><b>Con số của bài là bản adj sau BH-FDR; bản raw luôn được báo cáo kèm.</b> Không phải để đầy đủ hình thức —
+mà vì chính <i>hiệu giữa hai bản</i> mới là đóng góp: nó cho thấy một phân tích thô sẽ sai ở đâu, và sai
+theo chiều nào.</li>
+</ol></div>
+<div class="pb"></div>
+<h2>Phụ lục A · Mini-corpus đầy đủ — <span class="mono">cell[(period, stratum)][aspect]</span></h2>
+<p class="sub">Σw của quad complaint. Đây là <b>toàn bộ</b> input của Module D trong ví dụ này (kênh ν dùng <span class="mono">vcell</span>, cùng cấu trúc, chia thêm theo sentiment).</p>
+<h4>stratum <span class="mono">(VN, Cặp đôi)</span></h4>
+<table style="font-size:8.3px"><tr><th style="width:52px">kỳ</th><th class="n">AM_FOOD</th><th class="n">AM_WIFI</th><th class="n">AM_POOL</th><th class="n">FAC_ROOM</th><th class="n">SER_ATTITUDE</th><th class="n">Σ</th></tr>
+<tr><td class="mono">2022-03</td><td class="n">56,4</td><td class="n">167,9</td><td class="n">83,5</td><td class="n">275,4</td><td class="n">357,9</td><td class="n"><b>941,2</b></td></tr>
+<tr><td class="mono">2022-04</td><td class="n">62,0</td><td class="n">173,8</td><td class="n">90,3</td><td class="n">228,8</td><td class="n">327,3</td><td class="n"><b>882,2</b></td></tr>
+<tr><td class="mono">2022-05</td><td class="n">59,1</td><td class="n">168,0</td><td class="n">86,4</td><td class="n">196,3</td><td class="n">294,6</td><td class="n"><b>804,3</b></td></tr>
+<tr><td class="mono">2022-06</td><td class="n">67,1</td><td class="n">152,3</td><td class="n">77,8</td><td class="n">244,0</td><td class="n">251,7</td><td class="n"><b>792,8</b></td></tr>
+<tr><td class="mono">2022-07</td><td class="n">63,6</td><td class="n">174,1</td><td class="n">85,4</td><td class="n">185,1</td><td class="n">292,4</td><td class="n"><b>800,6</b></td></tr>
+<tr><td class="mono">2022-08</td><td class="n">60,0</td><td class="n">150,0</td><td class="n">75,6</td><td class="n">217,0</td><td class="n">243,7</td><td class="n"><b>746,3</b></td></tr>
+<tr><td class="mono">2022-09</td><td class="n">49,4</td><td class="n">157,4</td><td class="n">79,5</td><td class="n">192,0</td><td class="n">250,5</td><td class="n"><b>728,7</b></td></tr>
+<tr><td class="mono">2022-10</td><td class="n">44,7</td><td class="n">160,9</td><td class="n">68,5</td><td class="n">185,6</td><td class="n">239,0</td><td class="n"><b>698,7</b></td></tr>
+<tr><td class="mono">2022-11</td><td class="n">42,9</td><td class="n">133,2</td><td class="n">77,6</td><td class="n">148,5</td><td class="n">233,9</td><td class="n"><b>636,2</b></td></tr>
+<tr><td class="mono">2022-12</td><td class="n">37,0</td><td class="n">127,8</td><td class="n">76,1</td><td class="n">200,1</td><td class="n">249,6</td><td class="n"><b>690,6</b></td></tr>
+<tr><td class="mono">2023-01</td><td class="n">35,2</td><td class="n">139,0</td><td class="n">67,3</td><td class="n">160,8</td><td class="n">206,5</td><td class="n"><b>608,8</b></td></tr>
+<tr><td class="mono">2023-02</td><td class="n">33,8</td><td class="n">132,8</td><td class="n">60,9</td><td class="n">143,4</td><td class="n">234,8</td><td class="n"><b>605,6</b></td></tr>
+<tr><td class="mono">2023-03</td><td class="n">31,1</td><td class="n">127,1</td><td class="n">58,6</td><td class="n">114,5</td><td class="n">167,4</td><td class="n"><b>498,7</b></td></tr>
+<tr><td class="mono">2023-04</td><td class="n">31,8</td><td class="n">102,6</td><td class="n">51,7</td><td class="n">134,5</td><td class="n">181,8</td><td class="n"><b>502,4</b></td></tr>
+<tr><td class="mono">2023-05</td><td class="n">30,0</td><td class="n">84,1</td><td class="n">53,2</td><td class="n">122,3</td><td class="n">140,5</td><td class="n"><b>430,1</b></td></tr>
+<tr><td class="mono">2023-06</td><td class="n">35,0</td><td class="n">93,6</td><td class="n">61,9</td><td class="n">110,9</td><td class="n">144,1</td><td class="n"><b>445,5</b></td></tr>
+<tr><td class="mono">2023-07</td><td class="n">28,4</td><td class="n">96,6</td><td class="n">46,6</td><td class="n">121,8</td><td class="n">151,4</td><td class="n"><b>444,9</b></td></tr>
+<tr><td class="mono">2023-08</td><td class="n">30,9</td><td class="n">75,1</td><td class="n">47,8</td><td class="n">87,3</td><td class="n">158,7</td><td class="n"><b>399,8</b></td></tr>
+<tr><td class="mono">2023-09</td><td class="n">23,8</td><td class="n">73,5</td><td class="n">45,1</td><td class="n">86,4</td><td class="n">121,6</td><td class="n"><b>350,4</b></td></tr>
+<tr><td class="mono">2023-10</td><td class="n">20,4</td><td class="n">74,3</td><td class="n">41,6</td><td class="n">63,7</td><td class="n">107,6</td><td class="n"><b>307,7</b></td></tr>
+<tr><td class="mono">2023-11</td><td class="n">18,0</td><td class="n">65,4</td><td class="n">41,9</td><td class="n">72,0</td><td class="n">105,5</td><td class="n"><b>302,8</b></td></tr>
+<tr><td class="mono">2023-12</td><td class="n">12,7</td><td class="n">63,9</td><td class="n">30,3</td><td class="n">60,5</td><td class="n">103,0</td><td class="n"><b>270,3</b></td></tr>
+<tr><td class="mono">2024-01</td><td class="n">10,7</td><td class="n">49,8</td><td class="n">31,0</td><td class="n">50,4</td><td class="n">99,3</td><td class="n"><b>241,2</b></td></tr>
+<tr><td class="mono">2024-02</td><td class="n">8,5</td><td class="n">43,7</td><td class="n">26,1</td><td class="n">46,3</td><td class="n">83,7</td><td class="n"><b>208,2</b></td></tr>
+</table>
+<h4>stratum <span class="mono">(WEST, Cặp đôi)</span></h4>
+<table style="font-size:8.3px"><tr><th style="width:52px">kỳ</th><th class="n">AM_FOOD</th><th class="n">AM_WIFI</th><th class="n">AM_POOL</th><th class="n">FAC_ROOM</th><th class="n">SER_ATTITUDE</th><th class="n">Σ</th></tr>
+<tr><td class="mono">2022-03</td><td class="n">20,0</td><td class="n">11,6</td><td class="n">5,9</td><td class="n">23,6</td><td class="n">32,2</td><td class="n"><b>93,4</b></td></tr>
+<tr><td class="mono">2022-04</td><td class="n">24,7</td><td class="n">17,1</td><td class="n">8,0</td><td class="n">33,7</td><td class="n">42,6</td><td class="n"><b>126,1</b></td></tr>
+<tr><td class="mono">2022-05</td><td class="n">34,0</td><td class="n">19,5</td><td class="n">10,1</td><td class="n">47,8</td><td class="n">54,5</td><td class="n"><b>166,0</b></td></tr>
+<tr><td class="mono">2022-06</td><td class="n">44,3</td><td class="n">22,7</td><td class="n">12,0</td><td class="n">45,9</td><td class="n">69,4</td><td class="n"><b>194,3</b></td></tr>
+<tr><td class="mono">2022-07</td><td class="n">39,2</td><td class="n">33,2</td><td class="n">13,6</td><td class="n">51,8</td><td class="n">76,8</td><td class="n"><b>214,6</b></td></tr>
+<tr><td class="mono">2022-08</td><td class="n">57,8</td><td class="n">32,0</td><td class="n">15,8</td><td class="n">72,5</td><td class="n">93,2</td><td class="n"><b>271,3</b></td></tr>
+<tr><td class="mono">2022-09</td><td class="n">58,6</td><td class="n">43,1</td><td class="n">21,5</td><td class="n">69,5</td><td class="n">95,8</td><td class="n"><b>288,5</b></td></tr>
+<tr><td class="mono">2022-10</td><td class="n">61,1</td><td class="n">55,2</td><td class="n">19,8</td><td class="n">77,4</td><td class="n">87,1</td><td class="n"><b>300,6</b></td></tr>
+<tr><td class="mono">2022-11</td><td class="n">68,8</td><td class="n">55,1</td><td class="n">24,5</td><td class="n">86,8</td><td class="n">119,8</td><td class="n"><b>354,9</b></td></tr>
+<tr><td class="mono">2022-12</td><td class="n">67,2</td><td class="n">56,6</td><td class="n">22,7</td><td class="n">96,8</td><td class="n">123,4</td><td class="n"><b>366,7</b></td></tr>
+<tr><td class="mono">2023-01</td><td class="n">76,6</td><td class="n">51,9</td><td class="n">28,1</td><td class="n">101,8</td><td class="n">164,4</td><td class="n"><b>422,8</b></td></tr>
+<tr><td class="mono">2023-02</td><td class="n">63,4</td><td class="n">57,0</td><td class="n">31,8</td><td class="n">104,8</td><td class="n">157,5</td><td class="n"><b>414,6</b></td></tr>
+<tr><td class="mono">2023-03</td><td class="n">75,2</td><td class="n">70,5</td><td class="n">32,2</td><td class="n">128,2</td><td class="n">173,0</td><td class="n"><b>479,1</b></td></tr>
+<tr><td class="mono">2023-04</td><td class="n">91,9</td><td class="n">68,1</td><td class="n">39,5</td><td class="n">108,9</td><td class="n">154,0</td><td class="n"><b>462,4</b></td></tr>
+<tr><td class="mono">2023-05</td><td class="n">101,1</td><td class="n">88,1</td><td class="n">41,8</td><td class="n">136,7</td><td class="n">188,8</td><td class="n"><b>556,4</b></td></tr>
+<tr><td class="mono">2023-06</td><td class="n">123,5</td><td class="n">92,6</td><td class="n">39,6</td><td class="n">131,5</td><td class="n">190,2</td><td class="n"><b>577,4</b></td></tr>
+<tr><td class="mono">2023-07</td><td class="n">117,9</td><td class="n">108,0</td><td class="n">45,5</td><td class="n">114,7</td><td class="n">206,0</td><td class="n"><b>592,0</b></td></tr>
+<tr><td class="mono">2023-08</td><td class="n">105,6</td><td class="n">115,0</td><td class="n">56,5</td><td class="n">129,9</td><td class="n">178,9</td><td class="n"><b>586,0</b></td></tr>
+<tr><td class="mono">2023-09</td><td class="n">118,7</td><td class="n">101,2</td><td class="n">51,7</td><td class="n">144,5</td><td class="n">224,1</td><td class="n"><b>640,2</b></td></tr>
+<tr><td class="mono">2023-10</td><td class="n">109,0</td><td class="n">103,6</td><td class="n">53,8</td><td class="n">140,7</td><td class="n">251,6</td><td class="n"><b>658,7</b></td></tr>
+<tr><td class="mono">2023-11</td><td class="n">116,2</td><td class="n">124,7</td><td class="n">57,9</td><td class="n">170,5</td><td class="n">259,4</td><td class="n"><b>728,7</b></td></tr>
+<tr><td class="mono">2023-12</td><td class="n">128,4</td><td class="n">127,4</td><td class="n">61,2</td><td class="n">146,2</td><td class="n">272,6</td><td class="n"><b>735,7</b></td></tr>
+<tr><td class="mono">2024-01</td><td class="n">133,8</td><td class="n">129,9</td><td class="n">70,2</td><td class="n">140,6</td><td class="n">300,4</td><td class="n"><b>774,8</b></td></tr>
+<tr><td class="mono">2024-02</td><td class="n">115,0</td><td class="n">127,1</td><td class="n">69,1</td><td class="n">174,7</td><td class="n">268,4</td><td class="n"><b>754,4</b></td></tr>
+</table>
+<div class="pb"></div>
+<h2>Phụ lục B · Chuỗi π và ν đầy đủ 24 kỳ</h2>
+<h4>B.1 · π<sup>raw</sup> — share-of-complaints thô (%)</h4>
+<table style="font-size:8.3px"><tr><th style="width:52px">kỳ</th><th class="n">AM_FOOD</th><th class="n">AM_WIFI</th><th class="n">AM_POOL</th><th class="n">FAC_ROOM</th><th class="n">SER_ATTITUDE</th></tr>
+<tr><td class="mono">2022-03</td><td class="n">7,39</td><td class="n">17,36</td><td class="n">8,65</td><td class="n">28,90</td><td class="n">37,70</td></tr>
+<tr><td class="mono">2022-04</td><td class="n">8,59</td><td class="n">18,94</td><td class="n">9,75</td><td class="n">26,03</td><td class="n">36,69</td></tr>
+<tr><td class="mono">2022-05</td><td class="n">9,60</td><td class="n">19,32</td><td class="n">9,95</td><td class="n">25,15</td><td class="n">35,98</td></tr>
+<tr><td class="mono">2022-06</td><td class="n">11,29</td><td class="n">17,73</td><td class="n">9,09</td><td class="n">29,36</td><td class="n">32,52</td></tr>
+<tr><td class="mono">2022-07</td><td class="n">10,13</td><td class="n">20,42</td><td class="n">9,75</td><td class="n">23,33</td><td class="n">36,37</td></tr>
+<tr><td class="mono">2022-08</td><td class="n">11,57</td><td class="n">17,89</td><td class="n">8,98</td><td class="n">28,45</td><td class="n">33,11</td></tr>
+<tr><td class="mono">2022-09</td><td class="n">10,62</td><td class="n">19,71</td><td class="n">9,93</td><td class="n">25,70</td><td class="n">34,04</td></tr>
+<tr><td class="mono">2022-10</td><td class="n">10,59</td><td class="n">21,62</td><td class="n">8,84</td><td class="n">26,32</td><td class="n">32,63</td></tr>
+<tr><td class="mono">2022-11</td><td class="n">11,28</td><td class="n">18,99</td><td class="n">10,30</td><td class="n">23,74</td><td class="n">35,69</td></tr>
+<tr><td class="mono">2022-12</td><td class="n">9,86</td><td class="n">17,44</td><td class="n">9,35</td><td class="n">28,08</td><td class="n">35,28</td></tr>
+<tr><td class="mono">2023-01</td><td class="n">10,84</td><td class="n">18,51</td><td class="n">9,25</td><td class="n">25,46</td><td class="n">35,95</td></tr>
+<tr><td class="mono">2023-02</td><td class="n">9,53</td><td class="n">18,60</td><td class="n">9,09</td><td class="n">24,33</td><td class="n">38,45</td></tr>
+<tr><td class="mono">2023-03</td><td class="n">10,87</td><td class="n">20,20</td><td class="n">9,29</td><td class="n">24,81</td><td class="n">34,82</td></tr>
+<tr><td class="mono">2023-04</td><td class="n">12,83</td><td class="n">17,69</td><td class="n">9,45</td><td class="n">25,23</td><td class="n">34,81</td></tr>
+<tr><td class="mono">2023-05</td><td class="n">13,29</td><td class="n">17,46</td><td class="n">9,63</td><td class="n">26,25</td><td class="n">33,38</td></tr>
+<tr><td class="mono">2023-06</td><td class="n">15,50</td><td class="n">18,20</td><td class="n">9,93</td><td class="n">23,70</td><td class="n">32,68</td></tr>
+<tr><td class="mono">2023-07</td><td class="n">14,11</td><td class="n">19,73</td><td class="n">8,88</td><td class="n">22,81</td><td class="n">34,46</td></tr>
+<tr><td class="mono">2023-08</td><td class="n">13,85</td><td class="n">19,28</td><td class="n">10,59</td><td class="n">22,04</td><td class="n">34,24</td></tr>
+<tr><td class="mono">2023-09</td><td class="n">14,38</td><td class="n">17,64</td><td class="n">9,77</td><td class="n">23,30</td><td class="n">34,90</td></tr>
+<tr><td class="mono">2023-10</td><td class="n">13,39</td><td class="n">18,41</td><td class="n">9,87</td><td class="n">21,15</td><td class="n">37,18</td></tr>
+<tr><td class="mono">2023-11</td><td class="n">13,01</td><td class="n">18,43</td><td class="n">9,68</td><td class="n">23,51</td><td class="n">35,37</td></tr>
+<tr><td class="mono">2023-12</td><td class="n">14,02</td><td class="n">19,01</td><td class="n">9,09</td><td class="n">20,54</td><td class="n">37,33</td></tr>
+<tr><td class="mono">2024-01</td><td class="n">14,22</td><td class="n">17,68</td><td class="n">9,96</td><td class="n">18,79</td><td class="n">39,34</td></tr>
+<tr><td class="mono">2024-02</td><td class="n">12,82</td><td class="n">17,75</td><td class="n">9,89</td><td class="n">22,96</td><td class="n">36,57</td></tr>
+</table>
+<h4>B.2 · π<sup>adj</sup> — sau direct standardization (%)</h4>
+<table style="font-size:8.3px"><tr><th style="width:52px">kỳ</th><th class="n">AM_FOOD</th><th class="n">AM_WIFI</th><th class="n">AM_POOL</th><th class="n">FAC_ROOM</th><th class="n">SER_ATTITUDE</th></tr>
+<tr><td class="mono">2022-03</td><td class="n">11,39</td><td class="n">15,96</td><td class="n">8,00</td><td class="n">27,86</td><td class="n">36,79</td></tr>
+<tr><td class="mono">2022-04</td><td class="n">11,71</td><td class="n">17,41</td><td class="n">8,78</td><td class="n">26,22</td><td class="n">35,88</td></tr>
+<tr><td class="mono">2022-05</td><td class="n">12,52</td><td class="n">17,30</td><td class="n">8,92</td><td class="n">26,13</td><td class="n">35,14</td></tr>
+<tr><td class="mono">2022-06</td><td class="n">14,24</td><td class="n">16,18</td><td class="n">8,35</td><td class="n">27,89</td><td class="n">33,34</td></tr>
+<tr><td class="mono">2022-07</td><td class="n">12,15</td><td class="n">19,19</td><td class="n">8,90</td><td class="n">23,54</td><td class="n">36,23</td></tr>
+<tr><td class="mono">2022-08</td><td class="n">13,60</td><td class="n">16,62</td><td class="n">8,32</td><td class="n">28,09</td><td class="n">33,36</td></tr>
+<tr><td class="mono">2022-09</td><td class="n">12,50</td><td class="n">18,78</td><td class="n">9,45</td><td class="n">25,39</td><td class="n">33,88</td></tr>
+<tr><td class="mono">2022-10</td><td class="n">12,32</td><td class="n">21,04</td><td class="n">8,44</td><td class="n">26,22</td><td class="n">31,98</td></tr>
+<tr><td class="mono">2022-11</td><td class="n">12,22</td><td class="n">18,58</td><td class="n">9,90</td><td class="n">23,82</td><td class="n">35,47</td></tr>
+<tr><td class="mono">2022-12</td><td class="n">10,97</td><td class="n">17,18</td><td class="n">8,93</td><td class="n">27,86</td><td class="n">35,06</td></tr>
+<tr><td class="mono">2023-01</td><td class="n">11,20</td><td class="n">18,19</td><td class="n">9,12</td><td class="n">25,39</td><td class="n">36,10</td></tr>
+<tr><td class="mono">2023-02</td><td class="n">9,85</td><td class="n">18,34</td><td class="n">9,01</td><td class="n">24,38</td><td class="n">38,43</td></tr>
+<tr><td class="mono">2023-03</td><td class="n">10,48</td><td class="n">20,65</td><td class="n">9,50</td><td class="n">24,66</td><td class="n">34,71</td></tr>
+<tr><td class="mono">2023-04</td><td class="n">12,39</td><td class="n">17,87</td><td class="n">9,51</td><td class="n">25,33</td><td class="n">34,90</td></tr>
+<tr><td class="mono">2023-05</td><td class="n">12,09</td><td class="n">17,85</td><td class="n">10,15</td><td class="n">26,66</td><td class="n">33,24</td></tr>
+<tr><td class="mono">2023-06</td><td class="n">14,04</td><td class="n">18,74</td><td class="n">10,69</td><td class="n">23,93</td><td class="n">32,61</td></tr>
+<tr><td class="mono">2023-07</td><td class="n">12,58</td><td class="n">20,13</td><td class="n">9,20</td><td class="n">23,72</td><td class="n">34,38</td></tr>
+<tr><td class="mono">2023-08</td><td class="n">12,47</td><td class="n">19,17</td><td class="n">10,90</td><td class="n">21,99</td><td class="n">35,46</td></tr>
+<tr><td class="mono">2023-09</td><td class="n">12,28</td><td class="n">18,57</td><td class="n">10,63</td><td class="n">23,68</td><td class="n">34,85</td></tr>
+<tr><td class="mono">2023-10</td><td class="n">11,33</td><td class="n">20,16</td><td class="n">10,99</td><td class="n">21,01</td><td class="n">36,51</td></tr>
+<tr><td class="mono">2023-11</td><td class="n">10,71</td><td class="n">19,46</td><td class="n">11,03</td><td class="n">23,60</td><td class="n">35,20</td></tr>
+<tr><td class="mono">2023-12</td><td class="n">10,85</td><td class="n">20,59</td><td class="n">9,81</td><td class="n">21,16</td><td class="n">37,59</td></tr>
+<tr><td class="mono">2024-01</td><td class="n">10,71</td><td class="n">18,75</td><td class="n">11,00</td><td class="n">19,54</td><td class="n">40,00</td></tr>
+<tr><td class="mono">2024-02</td><td class="n">9,63</td><td class="n">18,94</td><td class="n">10,85</td><td class="n">22,69</td><td class="n">37,89</td></tr>
+</table>
+<h4>B.3 · clr(π<sup>adj</sup>) và bản đã khử mùa — chuỗi thật sự đi vào OLS</h4>
+<table style="font-size:8.3px"><tr><th style="width:52px">kỳ</th><th class="n" colspan="2">AM_FOOD</th><th class="n" colspan="2">AM_WIFI</th><th class="n" colspan="2">AM_POOL</th><th class="n" colspan="2">FAC_ROOM</th><th class="n" colspan="2">SER_ATTITUDE</th></tr><tr><th></th><th class="n">clr</th><th class="n">khử mùa</th><th class="n">clr</th><th class="n">khử mùa</th><th class="n">clr</th><th class="n">khử mùa</th><th class="n">clr</th><th class="n">khử mùa</th><th class="n">clr</th><th class="n">khử mùa</th></tr>
+<tr><td class="mono">2022-03</td><td class="n">-0,410</td><td class="n">-0,356</td><td class="n">-0,073</td><td class="n">-0,075</td><td class="n">-0,764</td><td class="n">-0,694</td><td class="n">0,484</td><td class="n">0,396</td><td class="n">0,762</td><td class="n">0,729</td></tr>
+<tr><td class="mono">2022-04</td><td class="n">-0,407</td><td class="n">-0,433</td><td class="n">-0,010</td><td class="n">0,035</td><td class="n">-0,695</td><td class="n">-0,654</td><td class="n">0,399</td><td class="n">0,345</td><td class="n">0,713</td><td class="n">0,707</td></tr>
+<tr><td class="mono">2022-05</td><td class="n">-0,350</td><td class="n">-0,388</td><td class="n">-0,027</td><td class="n">0,031</td><td class="n">-0,690</td><td class="n">-0,680</td><td class="n">0,385</td><td class="n">0,317</td><td class="n">0,682</td><td class="n">0,720</td></tr>
+<tr><td class="mono">2022-06</td><td class="n">-0,223</td><td class="n">-0,387</td><td class="n">-0,096</td><td class="n">-0,015</td><td class="n">-0,758</td><td class="n">-0,728</td><td class="n">0,449</td><td class="n">0,415</td><td class="n">0,628</td><td class="n">0,715</td></tr>
+<tr><td class="mono">2022-07</td><td class="n">-0,380</td><td class="n">-0,425</td><td class="n">0,077</td><td class="n">0,021</td><td class="n">-0,691</td><td class="n">-0,634</td><td class="n">0,281</td><td class="n">0,321</td><td class="n">0,713</td><td class="n">0,717</td></tr>
+<tr><td class="mono">2022-08</td><td class="n">-0,266</td><td class="n">-0,357</td><td class="n">-0,066</td><td class="n">-0,020</td><td class="n">-0,757</td><td class="n">-0,745</td><td class="n">0,459</td><td class="n">0,454</td><td class="n">0,631</td><td class="n">0,667</td></tr>
+<tr><td class="mono">2022-09</td><td class="n">-0,367</td><td class="n">-0,401</td><td class="n">0,041</td><td class="n">0,048</td><td class="n">-0,646</td><td class="n">-0,678</td><td class="n">0,342</td><td class="n">0,357</td><td class="n">0,630</td><td class="n">0,674</td></tr>
+<tr><td class="mono">2022-10</td><td class="n">-0,373</td><td class="n">-0,368</td><td class="n">0,162</td><td class="n">0,064</td><td class="n">-0,752</td><td class="n">-0,752</td><td class="n">0,382</td><td class="n">0,433</td><td class="n">0,581</td><td class="n">0,622</td></tr>
+<tr><td class="mono">2022-11</td><td class="n">-0,388</td><td class="n">-0,348</td><td class="n">0,031</td><td class="n">0,015</td><td class="n">-0,599</td><td class="n">-0,678</td><td class="n">0,279</td><td class="n">0,323</td><td class="n">0,677</td><td class="n">0,688</td></tr>
+<tr><td class="mono">2022-12</td><td class="n">-0,467</td><td class="n">-0,403</td><td class="n">-0,019</td><td class="n">-0,047</td><td class="n">-0,673</td><td class="n">-0,665</td><td class="n">0,465</td><td class="n">0,461</td><td class="n">0,695</td><td class="n">0,654</td></tr>
+<tr><td class="mono">2023-01</td><td class="n">-0,453</td><td class="n">-0,390</td><td class="n">0,031</td><td class="n">0,024</td><td class="n">-0,659</td><td class="n">-0,717</td><td class="n">0,365</td><td class="n">0,450</td><td class="n">0,717</td><td class="n">0,633</td></tr>
+<tr><td class="mono">2023-02</td><td class="n">-0,560</td><td class="n">-0,392</td><td class="n">0,061</td><td class="n">0,032</td><td class="n">-0,649</td><td class="n">-0,706</td><td class="n">0,346</td><td class="n">0,365</td><td class="n">0,801</td><td class="n">0,702</td></tr>
+<tr><td class="mono">2023-03</td><td class="n">-0,526</td><td class="n">-0,472</td><td class="n">0,152</td><td class="n">0,150</td><td class="n">-0,625</td><td class="n">-0,555</td><td class="n">0,329</td><td class="n">0,240</td><td class="n">0,671</td><td class="n">0,638</td></tr>
+<tr><td class="mono">2023-04</td><td class="n">-0,370</td><td class="n">-0,396</td><td class="n">-0,004</td><td class="n">0,041</td><td class="n">-0,635</td><td class="n">-0,595</td><td class="n">0,345</td><td class="n">0,291</td><td class="n">0,665</td><td class="n">0,660</td></tr>
+<tr><td class="mono">2023-05</td><td class="n">-0,403</td><td class="n">-0,441</td><td class="n">-0,014</td><td class="n">0,044</td><td class="n">-0,578</td><td class="n">-0,569</td><td class="n">0,387</td><td class="n">0,319</td><td class="n">0,608</td><td class="n">0,647</td></tr>
+<tr><td class="mono">2023-06</td><td class="n">-0,278</td><td class="n">-0,442</td><td class="n">0,010</td><td class="n">0,091</td><td class="n">-0,551</td><td class="n">-0,521</td><td class="n">0,255</td><td class="n">0,221</td><td class="n">0,564</td><td class="n">0,652</td></tr>
+<tr><td class="mono">2023-07</td><td class="n">-0,360</td><td class="n">-0,404</td><td class="n">0,111</td><td class="n">0,054</td><td class="n">-0,672</td><td class="n">-0,615</td><td class="n">0,275</td><td class="n">0,314</td><td class="n">0,646</td><td class="n">0,650</td></tr>
+<tr><td class="mono">2023-08</td><td class="n">-0,382</td><td class="n">-0,472</td><td class="n">0,048</td><td class="n">0,095</td><td class="n">-0,516</td><td class="n">-0,504</td><td class="n">0,186</td><td class="n">0,181</td><td class="n">0,664</td><td class="n">0,700</td></tr>
+<tr><td class="mono">2023-09</td><td class="n">-0,394</td><td class="n">-0,428</td><td class="n">0,020</td><td class="n">0,027</td><td class="n">-0,538</td><td class="n">-0,571</td><td class="n">0,263</td><td class="n">0,278</td><td class="n">0,649</td><td class="n">0,693</td></tr>
+<tr><td class="mono">2023-10</td><td class="n">-0,467</td><td class="n">-0,461</td><td class="n">0,110</td><td class="n">0,011</td><td class="n">-0,497</td><td class="n">-0,497</td><td class="n">0,151</td><td class="n">0,202</td><td class="n">0,703</td><td class="n">0,745</td></tr>
+<tr><td class="mono">2023-11</td><td class="n">-0,521</td><td class="n">-0,481</td><td class="n">0,076</td><td class="n">0,060</td><td class="n">-0,492</td><td class="n">-0,571</td><td class="n">0,269</td><td class="n">0,313</td><td class="n">0,668</td><td class="n">0,679</td></tr>
+<tr><td class="mono">2023-12</td><td class="n">-0,490</td><td class="n">-0,426</td><td class="n">0,151</td><td class="n">0,122</td><td class="n">-0,591</td><td class="n">-0,584</td><td class="n">0,178</td><td class="n">0,175</td><td class="n">0,753</td><td class="n">0,712</td></tr>
+<tr><td class="mono">2024-01</td><td class="n">-0,501</td><td class="n">-0,438</td><td class="n">0,059</td><td class="n">0,051</td><td class="n">-0,474</td><td class="n">-0,532</td><td class="n">0,100</td><td class="n">0,185</td><td class="n">0,817</td><td class="n">0,733</td></tr>
+<tr><td class="mono">2024-02</td><td class="n">-0,605</td><td class="n">-0,437</td><td class="n">0,072</td><td class="n">0,043</td><td class="n">-0,485</td><td class="n">-0,543</td><td class="n">0,253</td><td class="n">0,271</td><td class="n">0,765</td><td class="n">0,665</td></tr>
+</table>
+<h4>B.4 · ν<sup>raw</sup> và ν<sup>adj</sup> — negativity rate (%)</h4>
+<table style="font-size:8.3px"><tr><th style="width:52px">kỳ</th><th class="n" colspan="2">AM_FOOD</th><th class="n" colspan="2">AM_WIFI</th><th class="n" colspan="2">AM_POOL</th><th class="n" colspan="2">FAC_ROOM</th><th class="n" colspan="2">SER_ATTITUDE</th></tr><tr><th></th><th class="n">raw</th><th class="n">adj</th><th class="n">raw</th><th class="n">adj</th><th class="n">raw</th><th class="n">adj</th><th class="n">raw</th><th class="n">adj</th><th class="n">raw</th><th class="n">adj</th></tr>
+<tr><td class="mono">2022-03</td><td class="n">36,43</td><td class="n">39,42</td><td class="n">45,45</td><td class="n">46,02</td><td class="n">34,69</td><td class="n">34,83</td><td class="n">36,42</td><td class="n">35,17</td><td class="n">33,38</td><td class="n">33,34</td></tr>
+<tr><td class="mono">2022-04</td><td class="n">35,70</td><td class="n">38,24</td><td class="n">44,66</td><td class="n">44,85</td><td class="n">35,61</td><td class="n">35,44</td><td class="n">38,71</td><td class="n">37,26</td><td class="n">35,08</td><td class="n">35,40</td></tr>
+<tr><td class="mono">2022-05</td><td class="n">38,21</td><td class="n">39,57</td><td class="n">43,30</td><td class="n">44,53</td><td class="n">37,14</td><td class="n">36,88</td><td class="n">36,10</td><td class="n">36,25</td><td class="n">31,76</td><td class="n">31,82</td></tr>
+<tr><td class="mono">2022-06</td><td class="n">38,81</td><td class="n">39,75</td><td class="n">42,90</td><td class="n">42,14</td><td class="n">34,01</td><td class="n">33,83</td><td class="n">34,10</td><td class="n">35,31</td><td class="n">33,57</td><td class="n">33,76</td></tr>
+<tr><td class="mono">2022-07</td><td class="n">38,18</td><td class="n">39,21</td><td class="n">46,48</td><td class="n">45,08</td><td class="n">35,97</td><td class="n">36,04</td><td class="n">39,41</td><td class="n">39,43</td><td class="n">33,83</td><td class="n">33,81</td></tr>
+<tr><td class="mono">2022-08</td><td class="n">40,74</td><td class="n">39,91</td><td class="n">48,00</td><td class="n">47,22</td><td class="n">34,26</td><td class="n">34,20</td><td class="n">36,77</td><td class="n">36,35</td><td class="n">33,83</td><td class="n">33,43</td></tr>
+<tr><td class="mono">2022-09</td><td class="n">42,37</td><td class="n">40,54</td><td class="n">47,68</td><td class="n">47,44</td><td class="n">35,20</td><td class="n">35,16</td><td class="n">38,03</td><td class="n">37,67</td><td class="n">34,02</td><td class="n">34,36</td></tr>
+<tr><td class="mono">2022-10</td><td class="n">42,20</td><td class="n">39,87</td><td class="n">42,11</td><td class="n">43,07</td><td class="n">35,17</td><td class="n">34,99</td><td class="n">37,95</td><td class="n">37,81</td><td class="n">33,83</td><td class="n">33,69</td></tr>
+<tr><td class="mono">2022-11</td><td class="n">39,05</td><td class="n">36,47</td><td class="n">46,48</td><td class="n">45,71</td><td class="n">36,28</td><td class="n">35,38</td><td class="n">38,32</td><td class="n">38,48</td><td class="n">34,11</td><td class="n">34,14</td></tr>
+<tr><td class="mono">2022-12</td><td class="n">45,41</td><td class="n">41,37</td><td class="n">48,72</td><td class="n">48,40</td><td class="n">33,95</td><td class="n">33,54</td><td class="n">36,24</td><td class="n">36,23</td><td class="n">32,28</td><td class="n">32,19</td></tr>
+<tr><td class="mono">2023-01</td><td class="n">45,11</td><td class="n">40,91</td><td class="n">45,25</td><td class="n">45,98</td><td class="n">33,25</td><td class="n">33,29</td><td class="n">40,58</td><td class="n">40,43</td><td class="n">34,15</td><td class="n">34,15</td></tr>
+<tr><td class="mono">2023-02</td><td class="n">44,50</td><td class="n">41,19</td><td class="n">46,12</td><td class="n">46,34</td><td class="n">35,64</td><td class="n">35,37</td><td class="n">39,45</td><td class="n">39,47</td><td class="n">34,05</td><td class="n">34,20</td></tr>
+<tr><td class="mono">2023-03</td><td class="n">45,98</td><td class="n">41,47</td><td class="n">48,18</td><td class="n">47,84</td><td class="n">35,94</td><td class="n">35,82</td><td class="n">37,97</td><td class="n">37,85</td><td class="n">35,21</td><td class="n">35,16</td></tr>
+<tr><td class="mono">2023-04</td><td class="n">43,77</td><td class="n">38,47</td><td class="n">46,71</td><td class="n">46,54</td><td class="n">33,82</td><td class="n">33,82</td><td class="n">39,38</td><td class="n">39,39</td><td class="n">34,08</td><td class="n">34,08</td></tr>
+<tr><td class="mono">2023-05</td><td class="n">46,21</td><td class="n">40,59</td><td class="n">46,95</td><td class="n">46,92</td><td class="n">33,27</td><td class="n">33,28</td><td class="n">39,81</td><td class="n">39,71</td><td class="n">31,14</td><td class="n">31,25</td></tr>
+<tr><td class="mono">2023-06</td><td class="n">47,33</td><td class="n">41,61</td><td class="n">46,24</td><td class="n">46,11</td><td class="n">33,02</td><td class="n">33,12</td><td class="n">42,76</td><td class="n">43,11</td><td class="n">33,87</td><td class="n">33,92</td></tr>
+<tr><td class="mono">2023-07</td><td class="n">48,60</td><td class="n">41,37</td><td class="n">46,34</td><td class="n">46,32</td><td class="n">34,48</td><td class="n">34,41</td><td class="n">42,07</td><td class="n">42,10</td><td class="n">31,29</td><td class="n">30,82</td></tr>
+<tr><td class="mono">2023-08</td><td class="n">45,12</td><td class="n">40,64</td><td class="n">46,46</td><td class="n">46,00</td><td class="n">35,61</td><td class="n">35,56</td><td class="n">39,69</td><td class="n">39,43</td><td class="n">33,69</td><td class="n">33,84</td></tr>
+<tr><td class="mono">2023-09</td><td class="n">46,77</td><td class="n">40,62</td><td class="n">45,59</td><td class="n">45,62</td><td class="n">35,17</td><td class="n">35,24</td><td class="n">40,75</td><td class="n">40,85</td><td class="n">32,80</td><td class="n">33,24</td></tr>
+<tr><td class="mono">2023-10</td><td class="n">43,58</td><td class="n">39,03</td><td class="n">47,62</td><td class="n">47,18</td><td class="n">32,79</td><td class="n">32,90</td><td class="n">41,35</td><td class="n">41,26</td><td class="n">34,26</td><td class="n">34,24</td></tr>
+<tr><td class="mono">2023-11</td><td class="n">51,56</td><td class="n">43,72</td><td class="n">47,46</td><td class="n">47,42</td><td class="n">38,01</td><td class="n">37,74</td><td class="n">39,95</td><td class="n">39,67</td><td class="n">37,26</td><td class="n">36,17</td></tr>
+<tr><td class="mono">2023-12</td><td class="n">51,38</td><td class="n">43,88</td><td class="n">45,75</td><td class="n">45,83</td><td class="n">35,54</td><td class="n">35,48</td><td class="n">40,94</td><td class="n">41,90</td><td class="n">32,06</td><td class="n">32,42</td></tr>
+<tr><td class="mono">2024-01</td><td class="n">48,17</td><td class="n">40,58</td><td class="n">43,24</td><td class="n">44,63</td><td class="n">35,72</td><td class="n">35,48</td><td class="n">40,57</td><td class="n">40,01</td><td class="n">31,89</td><td class="n">32,63</td></tr>
+<tr><td class="mono">2024-02</td><td class="n">49,22</td><td class="n">42,21</td><td class="n">43,16</td><td class="n">43,10</td><td class="n">34,76</td><td class="n">34,97</td><td class="n">39,50</td><td class="n">41,04</td><td class="n">34,18</td><td class="n">34,46</td></tr>
+</table>
+<div class="foot">
+PRISM — Ví dụ xuyên suốt · biên soạn 2026-09-14 · bổ trợ cho <span class="mono">docs/prism_spec.pdf</span>
+(commit <span class="mono">fc5c774</span>).<br>
+Công thức và hằng số cấu hình trích từ <span class="mono">src/prism/{config,utils,module_b_infer,module_c_reliability,module_d_drift}.py</span>.
+Mini-corpus §8 và các hệ số hồi quy §7 là <b>số minh hoạ</b> do tài liệu này dựng — không trích vào bài.
+Mọi phép tính của §8 chạy qua bản sao nguyên văn của <span class="mono">shares_by_period · valence_by_period ·
+clr · deseason · ols_trend · best_split · welch_t · permutation_p · benjamini_hochberg</span>.
+</div>
+</body></html>
